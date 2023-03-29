@@ -90,7 +90,7 @@ module.exports = NodeHelper.create({
               date: nextPayDate
             };
           })
-          .sort((a, b) => self.compareFields(a, b))
+          .sort((a, b) => self.sortResults(a, b))
           .map((item) => {
             return {
               ...item,
