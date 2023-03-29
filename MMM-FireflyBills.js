@@ -78,6 +78,8 @@ Module.register("MMM-FireflyBills", {
   getTableRow(jsonObject) {
     const row = document.createElement("tr");
     Object.entries(jsonObject).forEach(([key, value]) => {
+      if (key === "pending") return;
+
       const cell = document.createElement("td");
 
       let valueToDisplay = "";
@@ -85,9 +87,20 @@ Module.register("MMM-FireflyBills", {
         cell.classList.add(
           "fa",
           "fa-fw",
-          value === true ? "fa-circle-check" : "fa-times-circle"
+          // eslint-disable-next-line no-nested-ternary
+          value === true
+            ? "fa-circle-check"
+            : jsonObject.pending === true
+            ? "fa-minus-circle"
+            : "fa-times-circle"
         );
-        cell.style.color = value === true ? "green" : "red";
+        cell.style.color =
+          // eslint-disable-next-line no-nested-ternary
+          value === true
+            ? "green"
+            : jsonObject.pending === true
+            ? "orange"
+            : "red";
       } else {
         cell.style.textAlign = key === "name" ? "left" : "right";
         if (key === "name") {
