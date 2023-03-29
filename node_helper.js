@@ -3,6 +3,7 @@ const Log = require("logger");
 const axios = require("axios");
 const moment = require("moment");
 require("moment/locale/es");
+
 moment.updateLocale("es");
 
 module.exports = NodeHelper.create({
@@ -15,10 +16,10 @@ module.exports = NodeHelper.create({
     const now = moment().startOf("day");
 
     axios({
-      url: url + "/api/v1/bills",
+      url: `${url}/api/v1/bills`,
       method: "GET",
       headers: {
-        Authorization: "Bearer " + token
+        Authorization: `Bearer ${token}`
       }
     })
       .then((response) => {
@@ -30,7 +31,7 @@ module.exports = NodeHelper.create({
             "day"
           );
 
-          let result = {
+          const result = {
             paid: null,
             name: item.attributes.name,
             date: null
@@ -47,10 +48,10 @@ module.exports = NodeHelper.create({
           }
           result.date = self.capitalize(expDate.format("MMM DD"));
           await axios({
-            url: url + "/api/v1/bills/" + item.id + "/transactions",
+            url: `${url}/api/v1/bills/${item.id}/transactions`,
             method: "GET",
             headers: {
-              Authorization: "Bearer " + token
+              Authorization: `Bearer ${token}`
             },
             params: {
               start: startDate,
@@ -68,7 +69,7 @@ module.exports = NodeHelper.create({
         });
 
         Promise.all(promises).then((results) => {
-          Log.log("Bills data received. " + results.length + " bills found");
+          Log.log(`Bills data received. ${results.length} bills found`);
           self.sendSocketNotification("MMM-FireflyBills_JSON_RESULT", results);
         });
       });

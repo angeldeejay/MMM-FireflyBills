@@ -1,4 +1,4 @@
-/* global Module moment */
+/* global Module */
 
 Module.register("MMM-FireflyBills", {
   jsonData: null,
