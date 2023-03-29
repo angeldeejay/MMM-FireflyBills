@@ -7,8 +7,7 @@ Module.register("MMM-FireflyBills", {
   defaults: {
     url: "",
     noDataText: "NO DATA",
-    tryFormatDate: true,
-    updateInterval: 5000,
+    updateInterval: 30000,
     animationSpeed: 500,
     descriptiveRow: null
   },
@@ -32,37 +31,32 @@ Module.register("MMM-FireflyBills", {
 
   socketNotificationReceived(notification, payload) {
     if (notification === "MMM-FireflyBills_JSON_RESULT") {
-      // Only continue if the notification came from the request we made
-      // This way we can load the module more than once
-      if (payload.url === this.config.url) {
-        this.jsonData = payload.data;
-        this.updateDom(this.config.animationSpeed);
-      }
+      this.jsonData = payload;
+      this.updateDom(this.config.animationSpeed);
     }
   },
 
   // Override dom generator.
   getDom() {
     const wrapper = document.createElement("div");
-    wrapper.className = "xsmall";
+    wrapper.className = "small";
+    console.log(this.jsonData);
 
     if (!this.jsonData) {
-      wrapper.innerHTML = "Awaiting json data...";
+      wrapper.innerHTML = "Awaiting bills dates...";
       return wrapper;
     }
 
     const table = document.createElement("table");
     const tbody = document.createElement("tbody");
 
-    const items = this.jsonData.data ?? this.jsonData;
-
     // Check if items is of type array
-    if (!(items instanceof Array)) {
+    if (!(this.jsonData instanceof Array)) {
       wrapper.innerHTML = this.config.noDataText;
       return wrapper;
     }
 
-    items.forEach((element) => {
+    this.jsonData.forEach((element) => {
       const row = this.getTableRow(element);
       tbody.appendChild(row);
     });
@@ -84,14 +78,15 @@ Module.register("MMM-FireflyBills", {
       const cell = document.createElement("td");
 
       let valueToDisplay = "";
-      if (key === "icon") {
-        cell.classList.add("fa", value);
-      } else if (this.config.tryFormatDate) {
-        valueToDisplay = this.getFormattedValue(value);
-      } else if (
-        this.config.keepColumns.length === 0 ||
-        this.config.keepColumns.indexOf(key) >= 0
-      ) {
+      if (key === "paid") {
+        cell.classList.add("fa", "fa-circle", "fa-fw");
+        cell.style.color = value === true ? "green" : "red";
+      } else {
+        cell.style.textAlign = key === "name" ? "left" : "right";
+        if (key === "name") {
+          cell.style.width = "20vw";
+        }
+        cell.style.paddingLeft = "0.5rem";
         valueToDisplay = value;
       }
 
@@ -108,23 +103,5 @@ Module.register("MMM-FireflyBills", {
       row.appendChild(cell);
     });
     return row;
-  },
-
-  // Format a date string or return the input
-  getFormattedValue(input) {
-    const m = moment(input);
-    if (typeof input === "string" && m.isValid()) {
-      // Show a formatted time if it occures today
-      if (
-        m.isSame(new Date(), "day") &&
-        m.hours() !== 0 &&
-        m.minutes() !== 0 &&
-        m.seconds() !== 0
-      ) {
-        return m.format("HH:mm:ss");
-      }
-      return m.format("YYYY-MM-DD");
-    }
-    return input;
   }
 });
