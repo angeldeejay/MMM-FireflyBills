@@ -8,7 +8,7 @@ For every column it checks if a valid DateTime is given, and then formats it to 
 ## Installation
 
 ```shell
-git clone https://github.com/timdows/MMM-FireflyBills
+git clone https://github.com/angeldeejay/MMM-FireflyBills
 cd MMM-FireflyBills
 npm install
 ```

@@ -11,6 +11,43 @@ module.exports = NodeHelper.create({
     Log.log("MMM-FireflyBills helper started...");
   },
 
+  compareDate(a, b) {
+    // eslint-disable-next-line no-nested-ternary
+    return a.date.isAfter(b.date) ? 1 : a.date.isBefore(b.date) ? -1 : 0;
+  },
+
+  comparePending(a, b) {
+    return b.pending - a.pending;
+  },
+
+  comparePaid(a, b) {
+    return a.pending - b.pending;
+  },
+
+  compareFields(a, b, field) {
+    switch (field) {
+      case "paid":
+        return this.comparePaid(a, b);
+      case "pending":
+        return this.comparePending(a, b);
+      case "date":
+        return this.compareDate(a, b);
+      default:
+        return 0;
+    }
+  },
+
+  sortResults(a, b) {
+    // eslint-disable-next-line no-restricted-syntax
+    for (const f of ["paid", "pending", "date"]) {
+      const ret = this.compareFields(a, b, f);
+      if (ret !== 0) {
+        return ret;
+      }
+    }
+    return 0;
+  },
+
   getBills(url, token) {
     const self = this;
     const now = moment().startOf("day");
