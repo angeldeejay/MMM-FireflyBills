@@ -64,7 +64,7 @@ module.exports = NodeHelper.create({
           .map((item) => {
             return {
               ...item,
-              date: self.capitalize(item.date.format("MMM D"))
+              date: self.capitalize(item.date.format("MMM Dº"))
             };
           });
         Log.log(`Bills data received. ${results.length} bills found`);
