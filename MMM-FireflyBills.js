@@ -1,18 +1,14 @@
 /* global Module moment */
 
-Module.register("MMM-JsonTable", {
+Module.register("MMM-FireflyBills", {
   jsonData: null,
 
   // Default module config.
   defaults: {
     url: "",
-    arrayName: null,
-    noDataText:
-      "Json data is not of type array! Maybe the config arrayName is not used and should be, or is configured wrong.",
-    keepColumns: [],
-    size: 0,
-    tryFormatDate: false,
-    updateInterval: 15000,
+    noDataText: "NO DATA",
+    tryFormatDate: true,
+    updateInterval: 5000,
     animationSpeed: 500,
     descriptiveRow: null
   },
@@ -31,11 +27,11 @@ Module.register("MMM-JsonTable", {
 
   // Request node_helper to get json from url
   getJson() {
-    this.sendSocketNotification("MMM-JsonTable_GET_JSON", this.config.url);
+    this.sendSocketNotification("MMM-FireflyBills_GET_JSON", this.config.url);
   },
 
   socketNotificationReceived(notification, payload) {
-    if (notification === "MMM-JsonTable_JSON_RESULT") {
+    if (notification === "MMM-FireflyBills_JSON_RESULT") {
       // Only continue if the notification came from the request we made
       // This way we can load the module more than once
       if (payload.url === this.config.url) {
@@ -58,12 +54,7 @@ Module.register("MMM-JsonTable", {
     const table = document.createElement("table");
     const tbody = document.createElement("tbody");
 
-    let items = [];
-    if (this.config.arrayName) {
-      items = this.jsonData[this.config.arrayName];
-    } else {
-      items = this.jsonData;
-    }
+    const items = this.jsonData.data ?? this.jsonData;
 
     // Check if items is of type array
     if (!(items instanceof Array)) {
