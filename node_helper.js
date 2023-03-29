@@ -71,7 +71,10 @@ module.exports = NodeHelper.create({
         });
 
         Promise.all(promises).then((results) => {
-          self.sendSocketNotification("MMM-FireflyBills_JSON_RESULT", results);
+          self.sendSocketNotification(
+            "MMM-FireflyBills_JSON_RESULT",
+            results.sort((a, b) => a.name.localeCompare(b.name))
+          );
         });
       });
   },
