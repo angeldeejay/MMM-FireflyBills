@@ -21,7 +21,7 @@ module.exports = NodeHelper.create({
   },
 
   comparePaid(a, b) {
-    return a.pending - b.pending;
+    return a.paid - b.paid;
   },
 
   compareFields(a, b, field) {
