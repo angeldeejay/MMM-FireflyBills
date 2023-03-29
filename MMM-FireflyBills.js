@@ -79,7 +79,11 @@ Module.register("MMM-FireflyBills", {
 
       let valueToDisplay = "";
       if (key === "paid") {
-        cell.classList.add("fa", "fa-circle", "fa-fw");
+        cell.classList.add(
+          "fa",
+          "fa-fw",
+          value === true ? "fa-circle-check" : "fa-circle-times"
+        );
         cell.style.color = value === true ? "green" : "red";
       } else {
         cell.style.textAlign = key === "name" ? "left" : "right";
