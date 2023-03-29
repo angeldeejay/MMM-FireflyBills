@@ -33,12 +33,19 @@ module.exports = NodeHelper.create({
       })
       .then((items) => {
         const results = items.map((item) => {
+          let nextPayDate;
+          if (item.attributes.pay_dates.length > 0) {
+            nextPayDate = moment(
+              item.attributes.pay_dates[0],
+              "YYYY-MM-DD"
+            ).format("MMM DD");
+          } else {
+            nextPayDate = moment().add(1, "month").format("MMM");
+          }
           return {
             paid: item.attributes.paid_dates.length > 0,
             name: item.attributes.name,
-            date: moment(item.attributes.pay_dates[0], "YYYY-MM-DD").format(
-              "MMM DD"
-            )
+            date: nextPayDate.format("MMM DD")
           };
         });
         Log.log(`Bills data received. ${results.length} bills found`);
