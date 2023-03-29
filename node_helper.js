@@ -38,11 +38,12 @@ module.exports = NodeHelper.create({
               item.attributes.next_expected_match,
               "YYYY-MM-DD"
             );
-            const pending = !nextPayDate.isBetween(startDate, endDate);
             let paid = false;
+            let pending = false;
             if (item.attributes.pay_dates.length > 0) {
               paid = item.attributes.paid_dates.length > 0;
             } else {
+              pending = !nextPayDate.isBetween(startDate, endDate);
               paid = true;
             }
             return {
