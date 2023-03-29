@@ -26,7 +26,10 @@ Module.register("MMM-FireflyBills", {
 
   // Request node_helper to get json from url
   getJson() {
-    this.sendSocketNotification("MMM-FireflyBills_GET_JSON", this.config.url);
+    this.sendSocketNotification("MMM-FireflyBills_GET_JSON", {
+      url: this.config.url,
+      token: this.config.token
+    });
   },
 
   socketNotificationReceived(notification, payload) {
