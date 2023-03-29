@@ -32,6 +32,8 @@ module.exports = NodeHelper.create({
         return this.comparePending(a, b);
       case "date":
         return this.compareDate(a, b);
+      case "name":
+        return a.name.localeCompare(b.name);
       default:
         return 0;
     }
@@ -39,7 +41,7 @@ module.exports = NodeHelper.create({
 
   sortResults(a, b) {
     // eslint-disable-next-line no-restricted-syntax
-    for (const f of ["paid", "pending", "date"]) {
+    for (const f of ["paid", "pending", "date", "name"]) {
       const ret = this.compareFields(a, b, f);
       if (ret !== 0) {
         return ret;
