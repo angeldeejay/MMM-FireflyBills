@@ -32,23 +32,38 @@ module.exports = NodeHelper.create({
         return response.data.data;
       })
       .then((items) => {
-        const results = items.map((item) => {
-          let nextPayDate = moment(
-            item.attributes.next_expected_match,
-            "YYYY-MM-DD"
-          ).format("MMM DD");
-          let paid;
-          if (item.attributes.pay_dates.length > 0) {
-            paid = item.attributes.paid_dates.length > 0;
-          } else {
-            paid = true;
-          }
-          return {
-            paid,
-            name: item.attributes.name,
-            date: self.capitalize(nextPayDate)
-          };
-        });
+        const results = items
+          .map((item) => {
+            let nextPayDate = moment(
+              item.attributes.next_expected_match,
+              "YYYY-MM-DD"
+            );
+            let paid;
+            if (item.attributes.pay_dates.length > 0) {
+              paid = item.attributes.paid_dates.length > 0;
+            } else {
+              paid = true;
+            }
+            return {
+              paid,
+              name: item.attributes.name,
+              date: self.capitalize(nextPayDate)
+            };
+          })
+          .sort((a, b) => {
+            // eslint-disable-next-line no-nested-ternary
+            return a.date.isAfter(b.date)
+              ? -1
+              : a.date.isBefore(b.date)
+              ? 1
+              : 0;
+          })
+          .map((item) => {
+            return {
+              ...item,
+              date: item.date.format("MMM do")
+            };
+          });
         Log.log(`Bills data received. ${results.length} bills found`);
         self.sendSocketNotification("MMM-FireflyBills_JSON_RESULT", results);
       });
