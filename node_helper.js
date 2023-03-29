@@ -97,8 +97,7 @@ module.exports = NodeHelper.create({
               date: self.capitalize(item.date.format("MMM Do"))
             };
           });
-        Log.log(`Bills data received. ${results.length} bills found`);
-        // Log.log(JSON.stringify(results, null, 2));
+        Log.info(`Bills data received. ${results.length} bills found`);
         self.sendSocketNotification("MMM-FireflyBills_JSON_RESULT", results);
       });
   },
