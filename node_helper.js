@@ -34,11 +34,11 @@ module.exports = NodeHelper.create({
       .then((items) => {
         const results = items
           .map((item) => {
-            let nextPayDate = moment(
+            const nextPayDate = moment(
               item.attributes.next_expected_match,
               "YYYY-MM-DD"
             );
-            let paid;
+            let paid = false;
             if (item.attributes.pay_dates.length > 0) {
               paid = item.attributes.paid_dates.length > 0;
             } else {
@@ -47,7 +47,7 @@ module.exports = NodeHelper.create({
             return {
               paid,
               name: item.attributes.name,
-              date: self.capitalize(nextPayDate)
+              date: nextPayDate
             };
           })
           .sort((a, b) => {
@@ -61,7 +61,7 @@ module.exports = NodeHelper.create({
           .map((item) => {
             return {
               ...item,
-              date: item.date.format("MMM do")
+              date: self.capitalize(item.date.format("MMM do"))
             };
           });
         Log.log(`Bills data received. ${results.length} bills found`);
