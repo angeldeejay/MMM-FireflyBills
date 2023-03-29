@@ -53,9 +53,9 @@ module.exports = NodeHelper.create({
           .sort((a, b) => {
             // eslint-disable-next-line no-nested-ternary
             return a.date.isAfter(b.date)
-              ? -1
-              : a.date.isBefore(b.date)
               ? 1
+              : a.date.isBefore(b.date)
+              ? -1
               : 0;
           })
           .map((item) => {
