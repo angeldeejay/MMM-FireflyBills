@@ -14,64 +14,35 @@ module.exports = NodeHelper.create({
   getBills(url, token) {
     const self = this;
     const now = moment().startOf("day");
+    const startDate = moment(now).startOf("month");
+    const endDate = moment(now).endOf("month");
 
     axios({
       url: `${url}/api/v1/bills`,
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`
+      },
+      params: {
+        start: startDate.format("YYYY-MM-DD"),
+        end: endDate.format("YYYY-MM-DD")
       }
     })
       .then((response) => {
         return response.data.data;
       })
       .then((items) => {
-        const promises = items.map(async (item) => {
-          let expDate = moment(item.attributes.date, "YYYY-MM-DD").startOf(
-            "day"
-          );
-
-          const result = {
-            paid: null,
+        const results = items.map((item) => {
+          return {
+            paid: item.attributes.paid_dates.length > 0,
             name: item.attributes.name,
-            date: null
+            date: moment(item.attributes.pay_dates[0], "YYYY-MM-DD").format(
+              "MMM DD"
+            )
           };
-
-          let startDate = moment(expDate, "YYYY-MM-DD").month(now.month());
-          while (startDate > now) {
-            startDate = startDate.subtract(1, "month");
-          }
-          const endDate = moment(startDate).add(1, "month");
-
-          while (expDate <= startDate) {
-            expDate = expDate.add(1, "month");
-          }
-          result.date = self.capitalize(expDate.format("MMM DD"));
-          await axios({
-            url: `${url}/api/v1/bills/${item.id}/transactions`,
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`
-            },
-            params: {
-              start: startDate.format("YYYY-MM-DD"),
-              end: endDate.format("YYYY-MM-DD")
-            }
-          })
-            .then((response) => {
-              return response.data.data;
-            })
-            .then((transactions) => {
-              result.paid = transactions.length > 0;
-            });
-
-          return result;
         });
-
-        Promise.all(promises).then((results) => {
-          Log.log(`Bills data received. ${results.length} bills found`);
-          self.sendSocketNotification("MMM-FireflyBills_JSON_RESULT", results);
-        });
+        Log.log(`Bills data received. ${results.length} bills found`);
+        self.sendSocketNotification("MMM-FireflyBills_JSON_RESULT", results);
       });
   },
 
