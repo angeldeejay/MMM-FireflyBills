@@ -38,7 +38,7 @@ module.exports = NodeHelper.create({
               item.attributes.next_expected_match,
               "YYYY-MM-DD"
             );
-            const pending = nextPayDate.isBetween(startDate, endDate) === false;
+            const pending = !nextPayDate.isBetween(startDate, endDate);
             let paid = false;
             if (item.attributes.pay_dates.length > 0) {
               paid = item.attributes.paid_dates.length > 0;
@@ -67,6 +67,7 @@ module.exports = NodeHelper.create({
             };
           });
         Log.log(`Bills data received. ${results.length} bills found`);
+        Log.log(JSON.stringify(results, null, 2));
         self.sendSocketNotification("MMM-FireflyBills_JSON_RESULT", results);
       });
   },
