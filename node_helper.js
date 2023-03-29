@@ -45,7 +45,7 @@ module.exports = NodeHelper.create({
           return {
             paid: item.attributes.paid_dates.length > 0,
             name: item.attributes.name,
-            date: nextPayDate.format("MMM DD")
+            date: self.capitalize(nextPayDate)
           };
         });
         Log.log(`Bills data received. ${results.length} bills found`);
