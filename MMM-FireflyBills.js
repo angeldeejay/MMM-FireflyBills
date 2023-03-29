@@ -79,6 +79,7 @@ Module.register("MMM-FireflyBills", {
     const row = document.createElement("tr");
     Object.entries(jsonObject).forEach(([key, value]) => {
       if (key === "pending") return;
+      console.log(key + ": " + value);
 
       const cell = document.createElement("td");
 

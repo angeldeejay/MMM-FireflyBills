@@ -44,7 +44,7 @@ module.exports = NodeHelper.create({
               paid = item.attributes.paid_dates.length > 0;
             } else {
               pending = !nextPayDate.isBetween(startDate, endDate);
-              paid = true;
+              paid = !pending;
             }
             return {
               paid,
@@ -68,7 +68,7 @@ module.exports = NodeHelper.create({
             };
           });
         Log.log(`Bills data received. ${results.length} bills found`);
-        Log.log(JSON.stringify(results, null, 2));
+        // Log.log(JSON.stringify(results, null, 2));
         self.sendSocketNotification("MMM-FireflyBills_JSON_RESULT", results);
       });
   },
