@@ -82,7 +82,7 @@ Module.register("MMM-FireflyBills", {
         cell.classList.add(
           "fa",
           "fa-fw",
-          value === true ? "fa-circle-check" : "fa-circle-times"
+          value === true ? "fa-circle-check" : "fa-times-circle"
         );
         cell.style.color = value === true ? "green" : "red";
       } else {
