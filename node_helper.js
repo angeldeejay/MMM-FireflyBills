@@ -54,8 +54,8 @@ module.exports = NodeHelper.create({
               Authorization: `Bearer ${token}`
             },
             params: {
-              start: startDate,
-              end: endDate
+              start: startDate.format("YYYY-MM-DD"),
+              end: endDate.format("YYYY-MM-DD")
             }
           })
             .then((response) => {
