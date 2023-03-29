@@ -7,6 +7,7 @@ Module.register("MMM-FireflyBills", {
   defaults: {
     url: "",
     noDataText: "NO DATA",
+    token: null,
     updateInterval: 30000,
     animationSpeed: 500,
     descriptiveRow: null
