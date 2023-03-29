@@ -33,17 +33,15 @@ module.exports = NodeHelper.create({
       })
       .then((items) => {
         const results = items.map((item) => {
-          let nextPayDate;
+          let nextPayDate = moment(
+            item.attributes.next_expected_match,
+            "YYYY-MM-DD"
+          ).format("MMM DD");
           let paid;
           if (item.attributes.pay_dates.length > 0) {
             paid = item.attributes.paid_dates.length > 0;
-            nextPayDate = moment(
-              item.attributes.pay_dates[0],
-              "YYYY-MM-DD"
-            ).format("MMM DD");
           } else {
             paid = true;
-            nextPayDate = moment().add(1, "month").format("MMM");
           }
           return {
             paid,
