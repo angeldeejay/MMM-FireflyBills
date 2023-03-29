@@ -68,6 +68,7 @@ module.exports = NodeHelper.create({
         });
 
         Promise.all(promises).then((results) => {
+          Log.log("Bills data received. " + results.length + " bills found");
           self.sendSocketNotification("MMM-FireflyBills_JSON_RESULT", results);
         });
       });

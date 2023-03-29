@@ -44,7 +44,6 @@ Module.register("MMM-FireflyBills", {
   getDom() {
     const wrapper = document.createElement("div");
     wrapper.className = "small";
-    console.log(this.jsonData);
 
     if (!this.jsonData) {
       wrapper.innerHTML = "Awaiting bills dates...";
