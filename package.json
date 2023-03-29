@@ -1,5 +1,5 @@
 {
-  "name": "mmm-FireflyBills",
+  "name": "MMM-FireflyBills",
   "version": "1.2.0",
   "description": "A module for the MagicMirror² project which creates a table filled with a list gathered from a json request.",
   "devDependencies": {
