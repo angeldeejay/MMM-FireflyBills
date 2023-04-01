@@ -8,7 +8,7 @@ Module.register("MMM-FireflyBills", {
     url: "",
     token: null,
     noDataText: "NO DATA",
-    updateInterval: 15000,
+    updateInterval: 30000,
     animationSpeed: 500,
     descriptiveRow: null
   },
@@ -86,20 +86,9 @@ Module.register("MMM-FireflyBills", {
         cell.classList.add(
           "fa",
           "fa-fw",
-          // eslint-disable-next-line no-nested-ternary
-          value === true
-            ? "fa-circle-check"
-            : jsonObject.pending === true
-            ? "fa-minus-circle"
-            : "fa-times-circle"
+          value === true ? "fa-circle-check" : "fa-times-circle"
         );
-        cell.style.color =
-          // eslint-disable-next-line no-nested-ternary
-          value === true
-            ? "green"
-            : jsonObject.pending === true
-            ? "orange"
-            : "red";
+        cell.style.color = value === true ? "green" : "red";
       } else {
         cell.style.textAlign = key === "name" ? "left" : "right";
         if (key === "name") {
