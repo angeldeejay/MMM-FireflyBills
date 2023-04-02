@@ -42,7 +42,8 @@
 
 .MMM-FireflyBills .billing_date-cell:after {
   content: "\f07e";
-  display: inline-block;
+  display: block;
+  float: right;
   color: orange;
   padding-left: 0.5rem;
 }
