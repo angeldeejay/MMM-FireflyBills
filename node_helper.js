@@ -66,17 +66,22 @@ module.exports = NodeHelper.create({
       )
       .then((bs) => {
         const promises = bs.map((b) => {
-          const rangeStart = moment(b.date, "YYYY-MM-DD").startOf("day");
-          const rangeEnd = moment(b.end_date, "YYYY-MM-DD").startOf("day");
-          const diff = Math.ceil(rangeEnd.diff(rangeStart, "days") / 30);
-          const nextPayDate = moment(
+          const endDay = moment(b.end_date, "YYYY-MM-DD").startOf("day").date();
+          const nextBillingDate = moment(
             b.next_expected_match,
             "YYYY-MM-DD"
           ).startOf("day");
-          const lastPayDate = moment(nextPayDate).subtract(1, "month");
-          const nextThresholdPayDate = moment(nextPayDate)
-            .add(diff, "month")
-            .date(rangeEnd.date())
+          let nextEndDate = moment(nextBillingDate).date(endDay);
+          while (nextEndDate.isBefore(nextBillingDate)) {
+            nextEndDate = nextEndDate.add(1, "month");
+          }
+          const rangeStart = moment(nextBillingDate).subtract(1, "month");
+          const rangeEnd = moment(nextBillingDate).subtract(1, "day");
+          const diff = moment
+            .duration(nextEndDate.diff(nextBillingDate))
+            .as("days");
+          const nextThresholdPayDate = moment(nextBillingDate)
+            .add(diff, "days")
             .startOf("day");
           return axios({
             url: `${url}/api/v1/bills/${b.id}`,
@@ -85,8 +90,8 @@ module.exports = NodeHelper.create({
               Authorization: `Bearer ${token}`
             },
             params: {
-              start: lastPayDate.format("YYYY-MM-DD"),
-              end: nextThresholdPayDate.format("YYYY-MM-DD")
+              start: rangeStart.format("YYYY-MM-DD"),
+              end: rangeEnd.format("YYYY-MM-DD")
             }
           }).then((response) => {
             const { data } = response.data;
