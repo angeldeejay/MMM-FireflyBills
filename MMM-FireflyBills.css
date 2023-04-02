@@ -54,8 +54,8 @@
 }
 
 .unpaid-bill .cell {
-  background-color: rgba(255, 0, 0, 0.16);
+  background-color: rgba(255, 0, 0, 0.24);
 }
 .paid-bill .cell {
-  background-color: rgba(0, 255, 0, 0.16);
+  background-color: rgba(0, 255, 0, 0.24);
 }
