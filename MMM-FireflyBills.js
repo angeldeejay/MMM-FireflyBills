@@ -92,7 +92,7 @@ Module.register("MMM-FireflyBills", {
       } else {
         cell.style.textAlign = key === "name" ? "left" : "right";
         if (key === "name") {
-          cell.style.width = "20vw";
+          cell.style.width = "18vw";
         } else {
           cell.classList.add("light");
         }
