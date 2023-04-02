@@ -4,9 +4,9 @@ const axios = require("axios");
 const moment = require("moment");
 require("moment/locale/es");
 
-moment.updateLocale("es");
-
 module.exports = NodeHelper.create({
+  busy: false,
+
   start() {
     Log.log("MMM-FireflyBills helper started...");
   },
@@ -97,8 +97,8 @@ module.exports = NodeHelper.create({
             const { data } = response.data;
             const { attributes } = data;
             return {
-              paid: attributes.paid_dates.length > 0,
               name: attributes.name,
+              paid: attributes.paid_dates.length > 0,
               billing_date: nextBillingDate,
               date: nextThresholdPayDate
             };
@@ -106,27 +106,18 @@ module.exports = NodeHelper.create({
         });
 
         Promise.all(promises).then((results) => {
-          const bills = results
-            .sort((a, b) => this.sortResults(a, b))
-            .map((b) => {
-              return {
-                ...b,
-                billing_date: this.capitalize(b.billing_date.format("MMM Do")),
-                date: this.capitalize(b.date.format("MMM Do"))
-              };
-            });
+          const bills = results.sort((a, b) => this.sortResults(a, b));
           Log.info(`Bills data received. ${bills.length} bills found`);
           this.sendSocketNotification("MMM-FireflyBills_JSON_RESULT", bills);
+          this.busy = false;
         });
       });
   },
 
-  capitalize(str) {
-    return str.charAt(0).toUpperCase() + str.slice(1);
-  },
   // Subclass socketNotificationReceived received.
   socketNotificationReceived(notification, payload) {
-    if (notification === "MMM-FireflyBills_GET_JSON") {
+    if (notification === "MMM-FireflyBills_GET_JSON" && this.busy === false) {
+      this.busy = true;
       this.getBills(payload.url, payload.token);
     }
   }

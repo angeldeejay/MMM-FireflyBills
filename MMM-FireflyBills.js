@@ -1,7 +1,10 @@
-/* global Module */
+/* global Module moment */
 
 Module.register("MMM-FireflyBills", {
   jsonData: null,
+  lastReceived: 0,
+  updatingInterval: null,
+  lang: null,
 
   // Default module config.
   defaults: {
@@ -14,15 +17,21 @@ Module.register("MMM-FireflyBills", {
   },
 
   start() {
-    this.getJson();
+    this.lang = this.config.lang || this.language || "en";
+    moment.updateLocale(this.lang);
+    moment.locale(this.lang);
     this.scheduleUpdate();
   },
 
   scheduleUpdate() {
-    const self = this;
-    setInterval(() => {
-      self.getJson();
-    }, this.config.updateInterval);
+    setTimeout(() => this.getJson(), 1000);
+    this.updatingInterval = setInterval(() => {
+      const ts = parseInt(moment().format("X"), 10);
+      if (ts - this.lastReceived > this.updateInterval) {
+        this.lastReceived = ts;
+        this.getJson();
+      }
+    }, 1000);
   },
 
   // Request node_helper to get json from url
@@ -35,8 +44,10 @@ Module.register("MMM-FireflyBills", {
 
   socketNotificationReceived(notification, payload) {
     if (notification === "MMM-FireflyBills_JSON_RESULT") {
+      this.lastReceived = parseInt(moment().format("X"), 10);
       this.jsonData = payload;
       this.updateDom(this.config.animationSpeed);
+      setTimeout(() => this.getJson(), 1000);
     }
   },
 
@@ -76,27 +87,21 @@ Module.register("MMM-FireflyBills", {
   },
 
   getTableRow(jsonObject) {
-    const row = document.createElement("tr");
-    Object.entries(jsonObject).forEach(([key, value]) => {
-      if (key === "pending") return;
+    moment.updateLocale(this.lang);
+    moment.locale(this.lang);
 
+    const row = document.createElement("tr");
+    let paid = false;
+    Object.entries(jsonObject).forEach(([key, value]) => {
       const cell = document.createElement("td");
+      cell.classList.add("cell", `${key}-cell`);
       let valueToDisplay = "";
       if (key === "paid") {
-        cell.classList.add(
-          "fa",
-          "fa-fw",
-          value === true ? "fa-circle-check" : "fa-times-circle"
-        );
-        cell.style.color = value === true ? "green" : "red";
+        paid = value;
+        cell.classList.add(`${value === true ? "" : "un"}paid`);
+      } else if (["date", "billing_date"].includes(key)) {
+        valueToDisplay = this.capitalize(moment(value).format("MMM Do"));
       } else {
-        cell.style.textAlign = key === "name" ? "left" : "right";
-        if (key === "name") {
-          cell.style.width = "18vw";
-        } else {
-          cell.classList.add("light");
-        }
-        cell.style.paddingLeft = "0.5rem";
         valueToDisplay = value;
       }
 
@@ -112,6 +117,20 @@ Module.register("MMM-FireflyBills", {
 
       row.appendChild(cell);
     });
+
+    row.classList.add(paid ? "paid-bill" : "unpaid-bill");
     return row;
+  },
+
+  capitalize(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  },
+
+  // Load stylesheets
+  getStyles() {
+    return [
+      "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css",
+      `${this.name}.css`
+    ];
   }
 });

@@ -1,0 +1,60 @@
+.MMM-FireflyBills .cell {
+  color: white;
+}
+
+.MMM-FireflyBills .paid-cell {
+  text-align: center;
+}
+
+.MMM-FireflyBills .paid-cell:before,
+.MMM-FireflyBills .billing_date-cell:after {
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+}
+
+.MMM-FireflyBills .paid-cell.paid {
+  color: green;
+}
+
+.MMM-FireflyBills .paid-cell.paid:before {
+  content: "\f058";
+}
+
+.MMM-FireflyBills .paid-cell.unpaid {
+  color: red;
+}
+
+.MMM-FireflyBills .paid-cell.unpaid:before {
+  content: "\f057";
+}
+
+.MMM-FireflyBills .name-cell {
+  text-align: left;
+  width: 15vw;
+}
+
+.MMM-FireflyBills .date-cell,
+.MMM-FireflyBills .billing_date-cell {
+  text-align: left;
+  /* text-justify: distribute; */
+  font-weight: 400;
+}
+
+.MMM-FireflyBills .billing_date-cell:after {
+  content: "\f07e";
+  display: inline-block;
+  color: orange;
+  padding-left: 0.5rem;
+}
+
+.MMM-FireflyBills .cell {
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+
+.unpaid-bill .cell {
+  background-color: rgba(255, 0, 0, 0.32);
+}
+.paid-bill .cell {
+  background-color: rgba(0, 255, 0, 0.32);
+}
