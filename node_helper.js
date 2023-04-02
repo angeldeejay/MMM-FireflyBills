@@ -111,6 +111,7 @@ module.exports = NodeHelper.create({
             .map((b) => {
               return {
                 ...b,
+                billing_date: this.capitalize(b.billing_date.format("MMM Do")),
                 date: this.capitalize(b.date.format("MMM Do"))
               };
             });
