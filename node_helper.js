@@ -99,6 +99,7 @@ module.exports = NodeHelper.create({
             return {
               paid: attributes.paid_dates.length > 0,
               name: attributes.name,
+              billing_date: nextBillingDate,
               date: nextThresholdPayDate
             };
           });
