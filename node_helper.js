@@ -16,6 +16,15 @@ module.exports = NodeHelper.create({
     return a.date.isAfter(b.date) ? 1 : a.date.isBefore(b.date) ? -1 : 0;
   },
 
+  compareBillingDate(a, b) {
+    // eslint-disable-next-line no-nested-ternary
+    return a.billing_date.isAfter(b.billing_date)
+      ? 1
+      : a.billing_date.isBefore(b.billing_date)
+      ? -1
+      : 0;
+  },
+
   comparePaid(a, b) {
     return a.paid - b.paid;
   },
@@ -26,6 +35,8 @@ module.exports = NodeHelper.create({
         return this.comparePaid(a, b);
       case "date":
         return this.compareDate(a, b);
+      case "billing_date":
+        return this.compareBillingDate(a, b);
       case "name":
         return a.name.localeCompare(b.name);
       default:
@@ -35,7 +46,7 @@ module.exports = NodeHelper.create({
 
   sortResults(a, b) {
     // eslint-disable-next-line no-restricted-syntax
-    for (const f of ["paid", "date", "name"]) {
+    for (const f of ["paid", "billing_date", "date", "name"]) {
       const ret = this.compareFields(a, b, f);
       if (ret !== 0) {
         return ret;
