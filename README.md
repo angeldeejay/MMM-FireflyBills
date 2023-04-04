@@ -1,9 +1,6 @@
 # MMM-FireflyBills
 
-A module for the [MagicMirror²](https://github.com/MichMich/MagicMirror) project which creates a table filled with a list gathered from a json request.
-
-All the variables of the objects in the array are represented by a table column.
-For every column it checks if a valid DateTime is given, and then formats it to `HH:mm:ss` if it is today or `YYYY-MM-DD` otherwise.
+[MagicMirror²](https://github.com/MichMich/MagicMirror) module to display a list of bills from FireFly III.
 
 ## Installation
 
