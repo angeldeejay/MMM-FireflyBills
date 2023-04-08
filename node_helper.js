@@ -59,70 +59,76 @@ module.exports = NodeHelper.create({
     const now = moment().startOf("day");
     const startDate = moment(now).startOf("month");
     const endDate = moment(now).endOf("month");
-    axios({
-      url: `${url}/api/v1/bills`,
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`
-      },
-      params: {
-        start: startDate.format("YYYY-MM-DD"),
-        end: endDate.format("YYYY-MM-DD")
-      }
-    })
-      .then((response) =>
-        response.data.data.map((b) => {
-          return { id: b.id, ...b.attributes };
-        })
-      )
-      .then((bs) => {
-        const promises = bs.map((b) => {
-          const endDay = moment(b.end_date, "YYYY-MM-DD").startOf("day").date();
-          const nextBillingDate = moment(
-            b.next_expected_match,
-            "YYYY-MM-DD"
-          ).startOf("day");
-          let nextEndDate = moment(nextBillingDate).date(endDay);
-          while (nextEndDate.isBefore(nextBillingDate)) {
-            nextEndDate = nextEndDate.add(1, "month");
-          }
-          const rangeStart = moment(nextBillingDate).subtract(1, "month");
-          const rangeEnd = moment(nextBillingDate).subtract(1, "day");
-          const diff = moment
-            .duration(nextEndDate.diff(nextBillingDate))
-            .as("days");
-          const nextThresholdPayDate = moment(nextBillingDate)
-            .add(diff, "days")
-            .startOf("day");
-          return axios({
-            url: `${url}/api/v1/bills/${b.id}`,
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`
-            },
-            params: {
-              start: rangeStart.format("YYYY-MM-DD"),
-              end: rangeEnd.format("YYYY-MM-DD")
+    try {
+      axios({
+        url: `${url}/api/v1/bills`,
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        params: {
+          start: startDate.format("YYYY-MM-DD"),
+          end: endDate.format("YYYY-MM-DD")
+        }
+      })
+        .then((response) =>
+          response.data.data.map((b) => {
+            return { id: b.id, ...b.attributes };
+          })
+        )
+        .then((bs) => {
+          const promises = bs.map((b) => {
+            const endDay = moment(b.end_date, "YYYY-MM-DD")
+              .startOf("day")
+              .date();
+            const nextBillingDate = moment(
+              b.next_expected_match,
+              "YYYY-MM-DD"
+            ).startOf("day");
+            let nextEndDate = moment(nextBillingDate).date(endDay);
+            while (nextEndDate.isBefore(nextBillingDate)) {
+              nextEndDate = nextEndDate.add(1, "month");
             }
-          }).then((response) => {
-            const { data } = response.data;
-            const { attributes } = data;
-            return {
-              name: attributes.name,
-              paid: attributes.paid_dates.length > 0,
-              billing_date: nextBillingDate,
-              date: nextThresholdPayDate
-            };
+            const rangeStart = moment(nextBillingDate).subtract(1, "month");
+            const rangeEnd = moment(nextBillingDate).subtract(1, "day");
+            const diff = moment
+              .duration(nextEndDate.diff(nextBillingDate))
+              .as("days");
+            const nextThresholdPayDate = moment(nextBillingDate)
+              .add(diff, "days")
+              .startOf("day");
+            return axios({
+              url: `${url}/api/v1/bills/${b.id}`,
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${token}`
+              },
+              params: {
+                start: rangeStart.format("YYYY-MM-DD"),
+                end: rangeEnd.format("YYYY-MM-DD")
+              }
+            }).then((response) => {
+              const { data } = response.data;
+              const { attributes } = data;
+              return {
+                name: attributes.name,
+                paid: attributes.paid_dates.length > 0,
+                billing_date: nextBillingDate,
+                date: nextThresholdPayDate
+              };
+            });
+          });
+
+          Promise.all(promises).then((results) => {
+            const bills = results.sort((a, b) => this.sortResults(a, b));
+            Log.info(`Bills data received. ${bills.length} bills found`);
+            this.sendSocketNotification("MMM-FireflyBills_JSON_RESULT", bills);
+            this.busy = false;
           });
         });
-
-        Promise.all(promises).then((results) => {
-          const bills = results.sort((a, b) => this.sortResults(a, b));
-          Log.info(`Bills data received. ${bills.length} bills found`);
-          this.sendSocketNotification("MMM-FireflyBills_JSON_RESULT", bills);
-          this.busy = false;
-        });
-      });
+    } catch (err) {
+      Log.error(err);
+    }
   },
 
   // Subclass socketNotificationReceived received.
