@@ -27,7 +27,7 @@ Module.register("MMM-FireflyBills", {
     setTimeout(() => this.getJson(), 1000);
     this.updatingInterval = setInterval(() => {
       const ts = parseInt(moment().format("X"), 10);
-      if (ts - this.lastReceived > this.updateInterval) {
+      if ((ts - this.lastReceived) > this.updateInterval) {
         this.lastReceived = ts;
         this.getJson();
       }

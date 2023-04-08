@@ -55,6 +55,20 @@ module.exports = NodeHelper.create({
     return 0;
   },
 
+  getPayments(url, token, b, rangeStart, rangeEnd) {
+    return axios({
+      url: `${url}/api/v1/bills/${b.id}`,
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`
+      },
+      params: {
+        start: rangeStart.format("YYYY-MM-DD"),
+        end: rangeEnd.format("YYYY-MM-DD")
+      }
+    });
+  },
+
   getBills(url, token) {
     const now = moment().startOf("day");
     const startDate = moment(now).startOf("month");
@@ -77,6 +91,7 @@ module.exports = NodeHelper.create({
           })
         )
         .then((bs) => {
+          Log.info(`Bills data received. ${bs.length} bills found`);
           const promises = bs.map((b) => {
             const endDay = moment(b.end_date, "YYYY-MM-DD")
               .startOf("day")
@@ -97,31 +112,25 @@ module.exports = NodeHelper.create({
             const nextThresholdPayDate = moment(nextBillingDate)
               .add(diff, "days")
               .startOf("day");
-            return axios({
-              url: `${url}/api/v1/bills/${b.id}`,
-              method: "GET",
-              headers: {
-                Authorization: `Bearer ${token}`
-              },
-              params: {
-                start: rangeStart.format("YYYY-MM-DD"),
-                end: rangeEnd.format("YYYY-MM-DD")
+            Log.info(`Getting payment data for bill ${b.name}`);
+            return this.getPayments(url, token, b, rangeStart, rangeEnd).then(
+              (response) => {
+                const { data } = response.data;
+                const { attributes } = data;
+                Log.info(`Payment data for bill ${attributes.name} received`);
+                return {
+                  name: attributes.name,
+                  paid: attributes.paid_dates.length > 0,
+                  billing_date: nextBillingDate,
+                  date: nextThresholdPayDate
+                };
               }
-            }).then((response) => {
-              const { data } = response.data;
-              const { attributes } = data;
-              return {
-                name: attributes.name,
-                paid: attributes.paid_dates.length > 0,
-                billing_date: nextBillingDate,
-                date: nextThresholdPayDate
-              };
-            });
+            );
           });
 
           Promise.all(promises).then((results) => {
             const bills = results.sort((a, b) => this.sortResults(a, b));
-            Log.info(`Bills data received. ${bills.length} bills found`);
+            Log.info(`Data processed for ${bills.length} bills`);
             this.sendSocketNotification("MMM-FireflyBills_JSON_RESULT", bills);
             this.busy = false;
           });
