@@ -93,13 +93,8 @@ module.exports = NodeHelper.create({
         .then((bs) => {
           Log.info(`Bills data received. ${bs.length} bills found`);
           const promises = bs.map((b) => {
-            const endDay = moment(b.end_date, "YYYY-MM-DD")
-              .startOf("day")
-              .date();
-            const nextBillingDate = moment(
-              b.next_expected_match,
-              "YYYY-MM-DD"
-            ).startOf("day");
+            const endDay = moment(b.end_date, "YYYY-MM-DD").date();
+            const nextBillingDate = moment(b.next_expected_match, "YYYY-MM-DD");
             let nextEndDate = moment(nextBillingDate).date(endDay);
             while (nextEndDate.isBefore(nextBillingDate)) {
               nextEndDate = nextEndDate.add(1, "month");
@@ -109,9 +104,10 @@ module.exports = NodeHelper.create({
             const diff = moment
               .duration(nextEndDate.diff(nextBillingDate))
               .as("days");
-            const nextThresholdPayDate = moment(nextBillingDate)
-              .add(diff, "days")
-              .startOf("day");
+            const nextThresholdPayDate = moment(nextBillingDate).add(
+              diff,
+              "days"
+            );
             Log.info(`Getting payment data for bill ${b.name}`);
             return this.getPayments(url, token, b, rangeStart, rangeEnd).then(
               (response) => {
