@@ -86,40 +86,55 @@ Module.register("MMM-FireflyBills", {
     return wrapper;
   },
 
-  getTableRow(jsonObject) {
-    moment.updateLocale(this.lang);
-    moment.locale(this.lang);
-
+  getTableRow(bill) {
     const row = document.createElement("tr");
-    let paid = false;
-    Object.entries(jsonObject).forEach(([key, value]) => {
-      const cell = document.createElement("td");
-      cell.classList.add("cell", `${key}-cell`);
-      let valueToDisplay = "";
-      if (key === "paid") {
-        paid = value;
-        cell.classList.add(`${value === true ? "" : "un"}paid`);
-      } else if (["date", "billing_date"].includes(key)) {
-        valueToDisplay = this.capitalize(moment(value).format("MMM Do"));
-      } else {
-        valueToDisplay = value;
-      }
-
+    Object.entries(bill).forEach(([k, v]) => {
+      const column = document.createElement("td");
+      column.classList.add(...this.getColumnClasses(bill, k));
+      const value = this.parseValue(k, v);
+      const valueToDisplay = this.formatValue(k, value);
       const cellText = document.createTextNode(valueToDisplay);
-
-      if (this.config.size > 0 && this.config.size < 9) {
-        const h = document.createElement(`H${this.config.size}`);
-        h.appendChild(cellText);
-        cell.appendChild(h);
-      } else {
-        cell.appendChild(cellText);
-      }
-
-      row.appendChild(cell);
+      column.appendChild(cellText);
+      row.appendChild(column);
     });
 
-    row.classList.add(paid ? "paid-bill" : "unpaid-bill");
+    row.classList.add(`${bill.paid ? "" : "un"}paid-bill`);
     return row;
+  },
+
+  getColumnClasses(bill, key) {
+    const classes = ["cell", `${key.replace("_", "-")}-cell`];
+    switch (key) {
+      case "paid":
+        classes.push(bill.paid ? "paid" : "unpaid");
+        break;
+      default:
+    }
+    return classes;
+  },
+
+  parseValue(key, value) {
+    moment.updateLocale(this.lang);
+    switch (key) {
+      case "start_date":
+      case "end_date":
+        return moment.unix(value).utc();
+      default:
+        return value;
+    }
+  },
+
+  formatValue(key, value) {
+    moment.locale(this.lang);
+    switch (key) {
+      case "start_date":
+      case "end_date":
+        return this.capitalize(value.format("MMM Do"));
+      case "paid":
+        return "";
+      default:
+        return `${value}`;
+    }
   },
 
   capitalize(str) {

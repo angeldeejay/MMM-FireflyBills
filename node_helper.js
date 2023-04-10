@@ -1,42 +1,34 @@
 const NodeHelper = require("node_helper");
 const Log = require("logger");
 const axios = require("axios");
+const axiosRetry = require("axios-retry");
 const moment = require("moment");
-require("moment/locale/es");
 
 module.exports = NodeHelper.create({
+  name: "MMM-FireflyBills",
   busy: false,
+  client: null,
 
   start() {
     Log.log("MMM-FireflyBills helper started...");
   },
 
-  compareDate(a, b) {
-    // eslint-disable-next-line no-nested-ternary
-    return a.date.isAfter(b.date) ? 1 : a.date.isBefore(b.date) ? -1 : 0;
-  },
-
-  compareBillingDate(a, b) {
-    // eslint-disable-next-line no-nested-ternary
-    return a.billing_date.isAfter(b.billing_date)
-      ? 1
-      : a.billing_date.isBefore(b.billing_date)
-      ? -1
-      : 0;
+  compareDate(a, b, direction) {
+    return direction === "asc" ? a - b : b - a;
   },
 
   comparePaid(a, b) {
     return a.paid - b.paid;
   },
 
-  compareFields(a, b, field) {
-    switch (field) {
+  compareFields(a, b, f) {
+    switch (f) {
       case "paid":
         return this.comparePaid(a, b);
-      case "date":
-        return this.compareDate(a, b);
-      case "billing_date":
-        return this.compareBillingDate(a, b);
+      case "start_date":
+        return this.compareDate(a[f], b[f], "asc");
+      case "end_date":
+        return this.compareDate(a[f], b[f], "desc");
       case "name":
         return a.name.localeCompare(b.name);
       default:
@@ -46,7 +38,7 @@ module.exports = NodeHelper.create({
 
   sortResults(a, b) {
     // eslint-disable-next-line no-restricted-syntax
-    for (const f of ["paid", "billing_date", "date", "name"]) {
+    for (const f of ["paid", "start_date", "end_date", "name"]) {
       const ret = this.compareFields(a, b, f);
       if (ret !== 0) {
         return ret;
@@ -55,36 +47,47 @@ module.exports = NodeHelper.create({
     return 0;
   },
 
-  getPayments(url, token, b, rangeStart, rangeEnd) {
-    return axios({
-      url: `${url}/api/v1/bills/${b.id}`,
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`
-      },
-      params: {
-        start: rangeStart.format("YYYY-MM-DD"),
-        end: rangeEnd.format("YYYY-MM-DD")
-      }
-    });
-  },
-
-  getBills(url, token) {
-    const now = moment().startOf("day");
-    const startDate = moment(now).startOf("month");
-    const endDate = moment(now).endOf("month");
-    try {
-      axios({
-        url: `${url}/api/v1/bills`,
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
+  getPayments(b) {
+    const sDay = moment.utc(b.date, "YYYY-MM-DD").date();
+    const eDay = moment.utc(b.end_date, "YYYY-MM-DD").date();
+    const nextRangeStart = moment.utc(b.next_expected_match, "YYYY-MM-DD");
+    const nextRangeEnd = nextRangeStart
+      .clone()
+      .date(eDay)
+      .add(sDay > eDay ? 1 : 0, "month");
+    const lastRangeStart = nextRangeStart.clone().subtract(1, "month");
+    const lastRangeEnd = nextRangeStart.clone().subtract(1, "second");
+    return this.client
+      .get(`/bills/${b.id}`, {
         params: {
-          start: startDate.format("YYYY-MM-DD"),
-          end: endDate.format("YYYY-MM-DD")
+          start: lastRangeStart.format("YYYY-MM-DD"),
+          end: lastRangeEnd.format("YYYY-MM-DD")
         }
       })
+      .then((response) => {
+        const { data } = response.data;
+        const { attributes } = data;
+        return {
+          name: attributes.name,
+          paid: attributes.paid_dates.length > 0,
+          start_date: parseInt(nextRangeStart.format("X"), 10),
+          end_date: parseInt(nextRangeEnd.format("X"), 10)
+        };
+      });
+  },
+
+  getBills() {
+    const now = moment.utc().startOf("day");
+    const startDate = now.clone().startOf("month");
+    const endDate = now.clone().endOf("month");
+    try {
+      this.client
+        .get("/bills", {
+          params: {
+            start: startDate.format("YYYY-MM-DD"),
+            end: endDate.format("YYYY-MM-DD")
+          }
+        })
         .then((response) =>
           response.data.data.map((b) => {
             return { id: b.id, ...b.attributes };
@@ -92,37 +95,7 @@ module.exports = NodeHelper.create({
         )
         .then((bs) => {
           Log.info(`Bills data received. ${bs.length} bills found`);
-          const promises = bs.map((b) => {
-            const endDay = moment(b.end_date, "YYYY-MM-DD").date();
-            const nextBillingDate = moment(b.next_expected_match, "YYYY-MM-DD");
-            let nextEndDate = moment(nextBillingDate).date(endDay);
-            while (nextEndDate.isBefore(nextBillingDate)) {
-              nextEndDate = nextEndDate.add(1, "month");
-            }
-            const rangeStart = moment(nextBillingDate).subtract(1, "month");
-            const rangeEnd = moment(nextBillingDate).subtract(1, "day");
-            const diff = moment
-              .duration(nextEndDate.diff(nextBillingDate))
-              .as("days");
-            const nextThresholdPayDate = moment(nextBillingDate).add(
-              diff,
-              "days"
-            );
-            Log.info(`Getting payment data for bill ${b.name}`);
-            return this.getPayments(url, token, b, rangeStart, rangeEnd).then(
-              (response) => {
-                const { data } = response.data;
-                const { attributes } = data;
-                Log.info(`Payment data for bill ${attributes.name} received`);
-                return {
-                  name: attributes.name,
-                  paid: attributes.paid_dates.length > 0,
-                  billing_date: moment(nextBillingDate).subtract(1, "day"),
-                  date: nextThresholdPayDate
-                };
-              }
-            );
-          });
+          const promises = bs.map((b) => this.getPayments(b));
 
           Promise.all(promises).then((results) => {
             const bills = results.sort((a, b) => this.sortResults(a, b));
@@ -133,6 +106,7 @@ module.exports = NodeHelper.create({
         });
     } catch (err) {
       Log.error(err);
+      this.busy = false;
     }
   },
 
@@ -140,7 +114,15 @@ module.exports = NodeHelper.create({
   socketNotificationReceived(notification, payload) {
     if (notification === "MMM-FireflyBills_GET_JSON" && this.busy === false) {
       this.busy = true;
-      this.getBills(payload.url, payload.token);
+      this.client = axios.create({
+        baseURL: `${payload.url}/api/v1/`,
+        headers: {
+          Authorization: `Bearer ${payload.token}`
+        }
+      });
+      Log.info("Requesting bills");
+      axiosRetry(this.client, { retries: 10 });
+      this.getBills();
     }
   }
 });
