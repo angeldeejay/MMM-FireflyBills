@@ -96,7 +96,10 @@ module.exports = NodeHelper.create({
           end: endDate.format("YYYY-MM-DD")
         }
       })
-      .catch((..._) => setTimeout(() => this.getBills(), 1000))
+      .catch((..._) => {
+        Log.error(`${this.logPrefix}${_}`);
+        setTimeout(() => this.getBills(), 1000);
+      })
       .then((response) => {
         Log.info(
           `${this.logPrefix}Bills data received. ${response.data.data.length} bills found`
