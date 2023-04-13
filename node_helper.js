@@ -103,8 +103,11 @@ module.exports = NodeHelper.create({
         }
       })
       .catch((..._) => {
-        Log.error(`${this.logPrefix}${_}`);
         this.busy = false;
+        setTimeout(() => {
+          this.busy = true;
+          this.getBills();
+        }, 100);
       })
       .then((response) => {
         Log.info(
@@ -114,6 +117,13 @@ module.exports = NodeHelper.create({
           .map((b) => ({ id: b.id, ...b.attributes }))
           .map((b) => this.getBillPayments(b))
           .resolveAll()
+          .catch((..._) => {
+            this.busy = false;
+            setTimeout(() => {
+              this.busy = true;
+              this.getBills();
+            }, 100);
+          })
           .then((results) => {
             const bills = results.sort((a, b) => this.sortResults(a, b));
             Log.info(
