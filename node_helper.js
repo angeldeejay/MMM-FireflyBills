@@ -105,7 +105,7 @@ module.exports = NodeHelper.create({
           }
         })
         .catch((..._) => {
-          throw new Error(`${this.logPrefix}Cannot get bills. Retrying...`);
+          throw `${this.logPrefix}Cannot get bills. Retrying...`;
         })
         .then((response) => {
           if (
@@ -116,7 +116,7 @@ module.exports = NodeHelper.create({
             typeof response.data.data === "undefined" ||
             !["array", "object"].includes(typeof response.data.data)
           )
-            throw new Error(`${this.logPrefix}Cannot get bills. Retrying...`);
+            throw `${this.logPrefix}Cannot get bills. Retrying...`;
 
           Log.info(
             `${this.logPrefix}Bills data received. ${response.data.data.length} bills found`
@@ -126,7 +126,7 @@ module.exports = NodeHelper.create({
             .map((b) => this.getBillPayments(b))
             .resolveAll()
             .catch((..._) => {
-              throw new Error(`${this.logPrefix}Cannot get bills. Retrying...`);
+              throw `${this.logPrefix}Cannot get bills. Retrying...`;
             })
             .then((results) => {
               const bills = results.sort((a, b) => this.sortResults(a, b));
