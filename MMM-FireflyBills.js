@@ -18,7 +18,7 @@ Module.register("MMM-FireflyBills", {
     this.lang = this.config.lang || this.language || "en";
     moment.updateLocale(this.lang);
     moment.locale(this.lang);
-    setTimeout(() => this.getJson(), 1000);
+    setInterval(() => this.getJson(), 5000);
   },
 
   // Request node_helper to get json from url
@@ -34,11 +34,8 @@ Module.register("MMM-FireflyBills", {
       case "MMM-FireflyBills_JSON_RESULT":
         this.jsonData = payload;
         this.updateDom(this.config.animationSpeed);
-        setTimeout(() => this.getJson(), 5000);
         break;
-      case "MMM-FireflyBills_RETRY":
-        setTimeout(() => this.getJson(), 5000);
-        break;
+      default:
     }
   },
 

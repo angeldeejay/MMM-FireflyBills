@@ -105,7 +105,6 @@ module.exports = NodeHelper.create({
       .catch((..._) => {
         Log.warn(`${this.logPrefix}Can't get bills data`);
         this.busy = false;
-        this.sendSocketNotification("MMM-FireflyBills_RETRY", true);
       })
       .then((response) => {
         if (
@@ -118,7 +117,6 @@ module.exports = NodeHelper.create({
         ) {
           Log.warn(`${this.logPrefix}Can't get bills data`);
           this.busy = false;
-          this.sendSocketNotification("MMM-FireflyBills_RETRY", true);
           return;
         }
 
@@ -132,7 +130,6 @@ module.exports = NodeHelper.create({
           .catch((..._) => {
             Log.warn(`${this.logPrefix}Can't get bills data`);
             this.busy = false;
-            this.sendSocketNotification("MMM-FireflyBills_RETRY", true);
           })
           .then((results) => {
             const bills = results.sort((a, b) => this.sortResults(a, b));
