@@ -98,7 +98,7 @@ module.exports = NodeHelper.create({
       })
       .catch((..._) => {
         Log.error(`${this.logPrefix}${_}`);
-        setTimeout(() => this.getBills(), 1000);
+        this.busy = false;
       })
       .then((response) => {
         Log.info(
