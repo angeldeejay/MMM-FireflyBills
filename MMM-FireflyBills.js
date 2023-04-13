@@ -1,6 +1,7 @@
 /* global Module */
 
 Module.register("MMM-FireflyBills", {
+  name: "MMM-FireflyBills",
   jsonData: null,
   lang: null,
 
@@ -18,20 +19,24 @@ Module.register("MMM-FireflyBills", {
     this.lang = this.config.lang || this.language || "en";
     moment.updateLocale(this.lang);
     moment.locale(this.lang);
-    setInterval(() => this.getJson(), 5000);
+    setInterval(() => this.getBills(), 5000);
+    this.getBills();
   },
 
-  // Request node_helper to get json from url
-  getJson() {
-    this.sendSocketNotification("MMM-FireflyBills_GET_JSON", {
+  getBills() {
+    this.notify("GET_BILLS", {
       url: this.config.url,
       token: this.config.token
     });
   },
 
+  notify(notification, payload) {
+    this.sendSocketNotification(`${this.name}_${notification}`, payload);
+  },
+
   socketNotificationReceived(notification, payload) {
     switch (notification) {
-      case "MMM-FireflyBills_JSON_RESULT":
+      case `${this.name}_BILLS`:
         this.jsonData = payload;
         this.updateDom(this.config.animationSpeed);
         break;

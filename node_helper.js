@@ -19,6 +19,10 @@ module.exports = NodeHelper.create({
     Log.log(`${this.logPrefix}Helper started`);
   },
 
+  notify(notification, payload) {
+    this.sendSocketNotification(`${this.name}_${notification}`, payload);
+  },
+
   compareDate(a, b, direction) {
     return direction === "asc" ? a - b : b - a;
   },
@@ -136,23 +140,34 @@ module.exports = NodeHelper.create({
             Log.info(
               `${this.logPrefix}Data processed for ${bills.length} bills`
             );
-            this.sendSocketNotification("MMM-FireflyBills_JSON_RESULT", bills);
+            this.notify("BILLS", bills);
             this.busy = false;
           });
       });
   },
 
+  notificationReceived(notification, payload) {
+    switch (notification) {
+      case "GET_BILLS":
+        if (!this.busy) {
+          this.client = axios.create({
+            baseURL: `${payload.url}/api/v1/`,
+            headers: {
+              Authorization: `Bearer ${payload.token}`
+            }
+          });
+          this.getBills();
+        }
+        break;
+      default:
+    }
+  },
+
   // Subclass socketNotificationReceived received.
   socketNotificationReceived(notification, payload) {
-    if (notification === "MMM-FireflyBills_GET_JSON" && this.busy === false) {
-      this.busy = true;
-      this.client = axios.create({
-        baseURL: `${payload.url}/api/v1/`,
-        headers: {
-          Authorization: `Bearer ${payload.token}`
-        }
-      });
-      this.getBills();
-    }
+    this.notificationReceived(
+      notification.replace(`${this.name}_`, ""),
+      payload
+    );
   }
 });
