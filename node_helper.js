@@ -4,6 +4,12 @@ const axios = require("axios");
 const axiosRetry = require("axios-retry");
 const moment = require("moment");
 
+Object.defineProperty(Array.prototype, "resolveAll", {
+  value: function () {
+    return Promise.all(this);
+  }
+});
+
 module.exports = NodeHelper.create({
   name: "MMM-FireflyBills",
   busy: false,
@@ -47,7 +53,7 @@ module.exports = NodeHelper.create({
     return 0;
   },
 
-  getPayments(b) {
+  getBillPayments(bs) {
     const sDay = moment.utc(b.date, "YYYY-MM-DD").date();
     const eDay = moment.utc(b.end_date, "YYYY-MM-DD").date();
     const nextRangeStart = moment.utc(b.next_expected_match, "YYYY-MM-DD");
@@ -80,34 +86,30 @@ module.exports = NodeHelper.create({
     const now = moment.utc().startOf("day");
     const startDate = now.clone().startOf("month");
     const endDate = now.clone().endOf("month");
-    try {
-      this.client
-        .get("/bills", {
-          params: {
-            start: startDate.format("YYYY-MM-DD"),
-            end: endDate.format("YYYY-MM-DD")
-          }
+    this.client
+      .get("/bills", {
+        params: {
+          start: startDate.format("YYYY-MM-DD"),
+          end: endDate.format("YYYY-MM-DD")
+        }
+      })
+      .catch((..._) => setTimeout(() => this.getBills(), 1000))
+      .then((response) =>
+        response.data.data.map((b) => {
+          return { id: b.id, ...b.attributes };
         })
-        .then((response) =>
-          response.data.data.map((b) => {
-            return { id: b.id, ...b.attributes };
-          })
-        )
-        .then((bs) => {
-          Log.info(`Bills data received. ${bs.length} bills found`);
-          const promises = bs.map((b) => this.getPayments(b));
-
-          Promise.all(promises).then((results) => {
+      )
+      .then((bs) => {
+        Log.info(`Bills data received. ${bs.length} bills found`);
+        bs.map((b) => this.getBillPayments(b))
+          .resolveAll()
+          .then((results) => {
             const bills = results.sort((a, b) => this.sortResults(a, b));
             Log.info(`Data processed for ${bills.length} bills`);
             this.sendSocketNotification("MMM-FireflyBills_JSON_RESULT", bills);
             this.busy = false;
           });
-        });
-    } catch (err) {
-      Log.error(err);
-      this.busy = false;
-    }
+      });
   },
 
   // Subclass socketNotificationReceived received.
