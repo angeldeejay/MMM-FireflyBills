@@ -111,8 +111,12 @@ module.exports = NodeHelper.create({
       })
       .then((response) => {
         if (
-          typeof response.data !== "object" ||
-          typeof response.data.data !== "array"
+          typeof response === "undefined" ||
+          response === null ||
+          typeof response.data === "undefined" ||
+          response.data === null ||
+          typeof response.data.data === "undefined" ||
+          !["array", "object"].includes(typeof response.data.data)
         ) {
           this.busy = false;
           setTimeout(() => {
