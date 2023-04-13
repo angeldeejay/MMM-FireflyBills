@@ -150,6 +150,7 @@ module.exports = NodeHelper.create({
     switch (notification) {
       case "GET_BILLS":
         if (!this.busy) {
+          this.busy = true;
           this.client = axios.create({
             baseURL: `${payload.url}/api/v1/`,
             headers: {
