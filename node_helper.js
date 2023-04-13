@@ -1,16 +1,17 @@
 const NodeHelper = require("node_helper");
 const Log = require("logger");
 const axios = require("axios");
-const axiosRetry = require("axios-retry");
 const moment = require("moment");
 
 module.exports = NodeHelper.create({
   name: __dirname.replace("\\", "/").split("/").pop(),
   busy: false,
   client: null,
+  logPrefix: null,
 
   start() {
-    Log.log("MMM-FireflyBills helper started...");
+    this.logPrefix = `${this.name} :: `;
+    Log.log(`${this.logPrefix}Helper started`);
   },
 
   compareDate(a, b, direction) {
@@ -98,7 +99,7 @@ module.exports = NodeHelper.create({
       .catch((..._) => setTimeout(() => this.getBills(), 1000))
       .then((response) => {
         Log.info(
-          `Bills data received. ${response.data.data.length} bills found`
+          `${this.logPrefix}Bills data received. ${response.data.data.length} bills found`
         );
         Promise.all(
           response.data.data
@@ -108,7 +109,7 @@ module.exports = NodeHelper.create({
             .map((b) => this.getBillPayments(b))
         ).then((results) => {
           const bills = results.sort((a, b) => this.sortResults(a, b));
-          Log.info(`Data processed for ${bills.length} bills`);
+          Log.info(`${this.logPrefix}Data processed for ${bills.length} bills`);
           this.sendSocketNotification("MMM-FireflyBills_JSON_RESULT", bills);
           this.busy = false;
         });
@@ -125,8 +126,7 @@ module.exports = NodeHelper.create({
           Authorization: `Bearer ${payload.token}`
         }
       });
-      Log.info("Requesting bills");
-      axiosRetry(this.client, { retries: 10 });
+      Log.info(`${this.logPrefix}Requesting bills`);
       this.getBills();
     }
   }
