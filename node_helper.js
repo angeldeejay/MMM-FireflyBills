@@ -53,7 +53,7 @@ module.exports = NodeHelper.create({
     return 0;
   },
 
-  getBillPayments(bs) {
+  getBillPayments(b) {
     const sDay = moment.utc(b.date, "YYYY-MM-DD").date();
     const eDay = moment.utc(b.end_date, "YYYY-MM-DD").date();
     const nextRangeStart = moment.utc(b.next_expected_match, "YYYY-MM-DD");
@@ -79,6 +79,14 @@ module.exports = NodeHelper.create({
           start_date: parseInt(nextRangeStart.format("X"), 10),
           end_date: parseInt(nextRangeEnd.format("X"), 10)
         };
+      })
+      .catch((..._) => {
+        return {
+          name: b.name,
+          paid: false,
+          start_date: parseInt(nextRangeStart.format("X"), 10),
+          end_date: parseInt(nextRangeEnd.format("X"), 10)
+        };
       });
   },
 
@@ -94,14 +102,15 @@ module.exports = NodeHelper.create({
         }
       })
       .catch((..._) => setTimeout(() => this.getBills(), 1000))
-      .then((response) =>
-        response.data.data.map((b) => {
-          return { id: b.id, ...b.attributes };
-        })
-      )
-      .then((bs) => {
-        Log.info(`Bills data received. ${bs.length} bills found`);
-        bs.map((b) => this.getBillPayments(b))
+      .then((response) => {
+        Log.info(
+          `Bills data received. ${response.data.data.length} bills found`
+        );
+        response.data.data
+          .map((b) => {
+            return { id: b.id, ...b.attributes };
+          })
+          .map((b) => this.getBillPayments(b))
           .resolveAll()
           .then((results) => {
             const bills = results.sort((a, b) => this.sortResults(a, b));
