@@ -110,6 +110,17 @@ module.exports = NodeHelper.create({
         }, 100);
       })
       .then((response) => {
+        if (
+          typeof response.data !== "object" ||
+          typeof response.data.data !== "array"
+        ) {
+          this.busy = false;
+          setTimeout(() => {
+            this.busy = true;
+            this.getBills();
+          }, 100);
+          return;
+        }
         Log.info(
           `${this.logPrefix}Bills data received. ${response.data.data.length} bills found`
         );
