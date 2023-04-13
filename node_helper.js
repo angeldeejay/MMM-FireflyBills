@@ -96,62 +96,58 @@ module.exports = NodeHelper.create({
     const now = moment.utc().startOf("day");
     const startDate = now.clone().startOf("month");
     const endDate = now.clone().endOf("month");
-    this.client
-      .get("/bills", {
-        params: {
-          start: startDate.format("YYYY-MM-DD"),
-          end: endDate.format("YYYY-MM-DD")
-        }
-      })
-      .catch((..._) => {
-        Log.warn(`${this.logPrefix}Cannot get bills. Retrying...`);
-        this.busy = false;
-        setTimeout(() => {
-          this.busy = true;
-          this.getBills();
-        }, 500);
-      })
-      .then((response) => {
-        if (
-          typeof response === "undefined" ||
-          response === null ||
-          typeof response.data === "undefined" ||
-          response.data === null ||
-          typeof response.data.data === "undefined" ||
-          !["array", "object"].includes(typeof response.data.data)
-        ) {
-          Log.warn(`${this.logPrefix}Cannot get bills. Retrying...`);
-          this.busy = false;
-          setTimeout(() => {
-            this.busy = true;
-            this.getBills();
-          }, 500);
-          return;
-        }
-        Log.info(
-          `${this.logPrefix}Bills data received. ${response.data.data.length} bills found`
-        );
-        response.data.data
-          .map((b) => ({ id: b.id, ...b.attributes }))
-          .map((b) => this.getBillPayments(b))
-          .resolveAll()
-          .catch((..._) => {
-            Log.warn(`${this.logPrefix}Cannot get bills. Retrying...`);
-            this.busy = false;
-            setTimeout(() => {
-              this.busy = true;
-              this.getBills();
-            }, 500);
-          })
-          .then((results) => {
-            const bills = results.sort((a, b) => this.sortResults(a, b));
-            Log.info(
-              `${this.logPrefix}Data processed for ${bills.length} bills`
-            );
-            this.sendSocketNotification("MMM-FireflyBills_JSON_RESULT", bills);
-            this.busy = false;
-          });
-      });
+    try {
+      this.client
+        .get("/bills", {
+          params: {
+            start: startDate.format("YYYY-MM-DD"),
+            end: endDate.format("YYYY-MM-DD")
+          }
+        })
+        .catch((..._) => {
+          throw new Error(`${this.logPrefix}Cannot get bills. Retrying...`);
+        })
+        .then((response) => {
+          if (
+            typeof response === "undefined" ||
+            response === null ||
+            typeof response.data === "undefined" ||
+            response.data === null ||
+            typeof response.data.data === "undefined" ||
+            !["array", "object"].includes(typeof response.data.data)
+          )
+            throw new Error(`${this.logPrefix}Cannot get bills. Retrying...`);
+
+          Log.info(
+            `${this.logPrefix}Bills data received. ${response.data.data.length} bills found`
+          );
+          response.data.data
+            .map((b) => ({ id: b.id, ...b.attributes }))
+            .map((b) => this.getBillPayments(b))
+            .resolveAll()
+            .catch((..._) => {
+              throw new Error(`${this.logPrefix}Cannot get bills. Retrying...`);
+            })
+            .then((results) => {
+              const bills = results.sort((a, b) => this.sortResults(a, b));
+              Log.info(
+                `${this.logPrefix}Data processed for ${bills.length} bills`
+              );
+              this.sendSocketNotification(
+                "MMM-FireflyBills_JSON_RESULT",
+                bills
+              );
+              this.busy = false;
+            });
+        });
+    } catch (err) {
+      Log.warn(`${this.logPrefix}Cannot get bills. Retrying...`);
+      this.busy = false;
+      setTimeout(() => {
+        this.busy = true;
+        this.getBills();
+      }, 500);
+    }
   },
 
   // Subclass socketNotificationReceived received.
