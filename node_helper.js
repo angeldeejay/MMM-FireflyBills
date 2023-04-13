@@ -92,6 +92,7 @@ module.exports = NodeHelper.create({
   },
 
   getBills() {
+    Log.info(`${this.logPrefix}Requesting bills`);
     const now = moment.utc().startOf("day");
     const startDate = now.clone().startOf("month");
     const endDate = now.clone().endOf("month");
@@ -103,11 +104,12 @@ module.exports = NodeHelper.create({
         }
       })
       .catch((..._) => {
+        Log.warn(`${this.logPrefix}Cannot get bills. Retrying...`);
         this.busy = false;
         setTimeout(() => {
           this.busy = true;
           this.getBills();
-        }, 100);
+        }, 500);
       })
       .then((response) => {
         if (
@@ -118,11 +120,12 @@ module.exports = NodeHelper.create({
           typeof response.data.data === "undefined" ||
           !["array", "object"].includes(typeof response.data.data)
         ) {
+          Log.warn(`${this.logPrefix}Cannot get bills. Retrying...`);
           this.busy = false;
           setTimeout(() => {
             this.busy = true;
             this.getBills();
-          }, 100);
+          }, 500);
           return;
         }
         Log.info(
@@ -133,11 +136,12 @@ module.exports = NodeHelper.create({
           .map((b) => this.getBillPayments(b))
           .resolveAll()
           .catch((..._) => {
+            Log.warn(`${this.logPrefix}Cannot get bills. Retrying...`);
             this.busy = false;
             setTimeout(() => {
               this.busy = true;
               this.getBills();
-            }, 100);
+            }, 500);
           })
           .then((results) => {
             const bills = results.sort((a, b) => this.sortResults(a, b));
@@ -160,7 +164,6 @@ module.exports = NodeHelper.create({
           Authorization: `Bearer ${payload.token}`
         }
       });
-      Log.info(`${this.logPrefix}Requesting bills`);
       this.getBills();
     }
   }
