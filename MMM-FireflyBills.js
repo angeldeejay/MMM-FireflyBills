@@ -145,7 +145,7 @@ Module.register("MMM-FireflyBills", {
   getStyles() {
     return [
       "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css",
-      `${this.name}.css`
+      this.file(`./${this.name}.css`)
     ];
   }
 });
