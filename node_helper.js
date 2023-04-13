@@ -4,14 +4,8 @@ const axios = require("axios");
 const axiosRetry = require("axios-retry");
 const moment = require("moment");
 
-Object.defineProperty(Array.prototype, "resolveAll", {
-  value: function () {
-    return Promise.all(this);
-  }
-});
-
 module.exports = NodeHelper.create({
-  name: "MMM-FireflyBills",
+  name: __dirname.replace("\\", "/").split("/").pop(),
   busy: false,
   client: null,
 
@@ -106,18 +100,18 @@ module.exports = NodeHelper.create({
         Log.info(
           `Bills data received. ${response.data.data.length} bills found`
         );
-        response.data.data
-          .map((b) => {
-            return { id: b.id, ...b.attributes };
-          })
-          .map((b) => this.getBillPayments(b))
-          .resolveAll()
-          .then((results) => {
-            const bills = results.sort((a, b) => this.sortResults(a, b));
-            Log.info(`Data processed for ${bills.length} bills`);
-            this.sendSocketNotification("MMM-FireflyBills_JSON_RESULT", bills);
-            this.busy = false;
-          });
+        Promise.all(
+          response.data.data
+            .map((b) => {
+              return { id: b.id, ...b.attributes };
+            })
+            .map((b) => this.getBillPayments(b))
+        ).then((results) => {
+          const bills = results.sort((a, b) => this.sortResults(a, b));
+          Log.info(`Data processed for ${bills.length} bills`);
+          this.sendSocketNotification("MMM-FireflyBills_JSON_RESULT", bills);
+          this.busy = false;
+        });
       });
   },
 
