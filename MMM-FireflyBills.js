@@ -141,6 +141,10 @@ Module.register("MMM-FireflyBills", {
     return str.charAt(0).toUpperCase() + str.slice(1);
   },
 
+  getScripts() {
+    return [this.file("node_modules/moment/dist/moment.js")];
+  },
+
   // Load stylesheets
   getStyles() {
     return [
