@@ -106,10 +106,6 @@ module.exports = NodeHelper.create({
           end: endDate.format("YYYY-MM-DD")
         }
       })
-      .catch((..._) => {
-        Log.warn(`${this.logPrefix}Can't get bills data`);
-        this.busy = false;
-      })
       .then((response) => {
         if (
           typeof response === "undefined" ||
@@ -143,6 +139,10 @@ module.exports = NodeHelper.create({
             this.notify("BILLS", bills);
             this.busy = false;
           });
+      })
+      .catch((..._) => {
+        Log.warn(`${this.logPrefix}Can't get bills data`);
+        this.busy = false;
       });
   },
 
