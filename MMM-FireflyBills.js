@@ -2,8 +2,6 @@
 
 Module.register("MMM-FireflyBills", {
   jsonData: null,
-  lastReceived: 0,
-  updatingInterval: null,
   lang: null,
 
   // Default module config.
@@ -20,18 +18,7 @@ Module.register("MMM-FireflyBills", {
     this.lang = this.config.lang || this.language || "en";
     moment.updateLocale(this.lang);
     moment.locale(this.lang);
-    this.scheduleUpdate();
-  },
-
-  scheduleUpdate() {
     setTimeout(() => this.getJson(), 1000);
-    this.updatingInterval = setInterval(() => {
-      const ts = parseInt(moment().format("X"), 10);
-      if (ts - this.lastReceived > this.updateInterval) {
-        this.lastReceived = ts;
-        this.getJson();
-      }
-    }, 1000);
   },
 
   // Request node_helper to get json from url
@@ -43,11 +30,15 @@ Module.register("MMM-FireflyBills", {
   },
 
   socketNotificationReceived(notification, payload) {
-    if (notification === "MMM-FireflyBills_JSON_RESULT") {
-      this.lastReceived = parseInt(moment().format("X"), 10);
-      this.jsonData = payload;
-      this.updateDom(this.config.animationSpeed);
-      setTimeout(() => this.getJson(), 5000);
+    switch (notification) {
+      case "MMM-FireflyBills_JSON_RESULT":
+        this.jsonData = payload;
+        this.updateDom(this.config.animationSpeed);
+        setTimeout(() => this.getJson(), 5000);
+        break;
+      case "MMM-FireflyBills_RETRY":
+        setTimeout(() => this.getJson(), 5000);
+        break;
     }
   },
 
