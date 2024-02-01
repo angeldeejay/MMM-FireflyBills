@@ -7,7 +7,7 @@
 }
 
 .MMM-FireflyBills .paid-cell:before,
-.MMM-FireflyBills .start-date-cell:after {
+.MMM-FireflyBills .last-payment-cell:after {
   font-family: "Font Awesome 6 Free";
   font-weight: 900;
 }
@@ -33,19 +33,11 @@
   width: 15vw;
 }
 
-.MMM-FireflyBills .start-date-cell,
-.MMM-FireflyBills .end-date-cell {
+.MMM-FireflyBills .last-payment-cell,
+.MMM-FireflyBills .expected-date-cell {
   text-align: left;
   /* text-justify: distribute; */
   font-weight: 400;
-}
-
-.MMM-FireflyBills .start-date-cell:after {
-  content: "\f07e";
-  display: block;
-  float: right;
-  color: orange;
-  padding-left: 0.5rem;
 }
 
 .MMM-FireflyBills .cell {

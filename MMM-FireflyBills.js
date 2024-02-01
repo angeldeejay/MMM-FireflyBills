@@ -16,9 +16,6 @@ Module.register("MMM-FireflyBills", {
   },
 
   start() {
-    this.lang = this.config.lang || this.language || "en";
-    moment.updateLocale(this.lang);
-    moment.locale(this.lang);
     setInterval(() => this.getBills(), 5000);
     this.getBills();
   },
@@ -84,7 +81,7 @@ Module.register("MMM-FireflyBills", {
     Object.entries(bill).forEach(([k, v]) => {
       const column = document.createElement("td");
       column.classList.add(...this.getColumnClasses(bill, k));
-      const value = this.parseValue(k, v);
+      const value = v;
       const valueToDisplay = this.formatValue(k, value);
       const cellText = document.createTextNode(valueToDisplay);
       column.appendChild(cellText);
@@ -106,23 +103,11 @@ Module.register("MMM-FireflyBills", {
     return classes;
   },
 
-  parseValue(key, value) {
-    moment.updateLocale(this.lang);
-    switch (key) {
-      case "start_date":
-      case "end_date":
-        return moment.unix(value).utc();
-      default:
-        return value;
-    }
-  },
-
   formatValue(key, value) {
-    moment.locale(this.lang);
     switch (key) {
-      case "start_date":
-      case "end_date":
-        return this.capitalize(value.format("MMM Do"));
+      case "last_payment":
+      case "expected_date":
+        return this.capitalize(value);
       case "paid":
         return "";
       default:
@@ -132,10 +117,6 @@ Module.register("MMM-FireflyBills", {
 
   capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
-  },
-
-  getScripts() {
-    return ["moment.js"];
   },
 
   // Load stylesheets

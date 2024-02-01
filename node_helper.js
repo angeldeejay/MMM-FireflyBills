@@ -2,6 +2,15 @@ const NodeHelper = require("node_helper");
 const Log = require("logger");
 const axios = require("axios");
 const moment = require("moment");
+const fs = require("fs");
+const path = require("path");
+
+const FF_DATETIME_FMT = "YYYY-MM-DDTHH:mm:ssZZ";
+const MM_CONFIG = path.join(
+  path.dirname(path.dirname(__dirname)),
+  "config",
+  "config.js"
+);
 
 Object.defineProperty(Array.prototype, "resolveAll", {
   value: function () {
@@ -13,10 +22,22 @@ module.exports = NodeHelper.create({
   name: __dirname.replace("\\", "/").split("/").pop(),
   client: null,
   logPrefix: null,
+  lang: null,
 
   start() {
     this.logPrefix = `${this.name} :: `;
+    this.lang = this.getMmConfig().language || "en";
+    moment.updateLocale(this.lang);
+    moment.locale(this.lang);
     Log.log(`${this.logPrefix}Helper started`);
+  },
+
+  getMmConfig() {
+    return eval(
+      `function __getConfig(){\n${fs.readFileSync(MM_CONFIG, {
+        encoding: "utf8"
+      })};\nreturn config;\n}\n__getConfig();`
+    );
   },
 
   notify(notification, payload) {
@@ -24,21 +45,23 @@ module.exports = NodeHelper.create({
   },
 
   compareDate(a, b, direction) {
-    return direction === "asc" ? a - b : b - a;
+    return direction === "asc" ? a.diff(b, "days") : b.diff(a, "days");
   },
 
   comparePaid(a, b) {
-    return a.paid - b.paid;
+    return a.paid ? (b.paid ? 0 : 1) : -1;
+  },
+
+  parseDate(date) {
+    return moment(date, FF_DATETIME_FMT);
   },
 
   compareFields(a, b, f) {
     switch (f) {
       case "paid":
         return this.comparePaid(a, b);
-      case "start_date":
+      case "expected_date":
         return this.compareDate(a[f], b[f], "asc");
-      case "end_date":
-        return this.compareDate(a[f], b[f], "desc");
       case "name":
         return a.name.localeCompare(b.name);
       default:
@@ -48,7 +71,7 @@ module.exports = NodeHelper.create({
 
   sortResults(a, b) {
     // eslint-disable-next-line no-restricted-syntax
-    for (const f of ["paid", "start_date", "end_date", "name"]) {
+    for (const f of ["paid", "expected_date", "name"]) {
       const ret = this.compareFields(a, b, f);
       if (ret !== 0) {
         return ret;
@@ -57,48 +80,11 @@ module.exports = NodeHelper.create({
     return 0;
   },
 
-  getBillPayments(b) {
-    const sDay = moment.utc(b.date, "YYYY-MM-DD").date();
-    const eDay = moment.utc(b.end_date, "YYYY-MM-DD").date();
-    const nextRangeStart = moment.utc(b.next_expected_match, "YYYY-MM-DD");
-    const nextRangeEnd = nextRangeStart
-      .clone()
-      .date(eDay)
-      .add(sDay > eDay ? 1 : 0, "month");
-    const lastRangeStart = nextRangeStart.clone().subtract(1, "month");
-    const lastRangeEnd = nextRangeStart.clone().subtract(1, "second");
-    return this.client
-      .get(`/bills/${b.id}`, {
-        params: {
-          start: lastRangeStart.format("YYYY-MM-DD"),
-          end: lastRangeEnd.format("YYYY-MM-DD")
-        }
-      })
-      .then((response) => {
-        const { data } = response.data;
-        const { attributes } = data;
-        return {
-          name: attributes.name,
-          paid: attributes.paid_dates.length > 0,
-          start_date: parseInt(nextRangeStart.format("X"), 10),
-          end_date: parseInt(nextRangeEnd.format("X"), 10)
-        };
-      })
-      .catch((..._) => {
-        return {
-          name: b.name,
-          paid: false,
-          start_date: parseInt(nextRangeStart.format("X"), 10),
-          end_date: parseInt(nextRangeEnd.format("X"), 10)
-        };
-      });
-  },
-
   getBills() {
     Log.info(`${this.logPrefix}Requesting bills`);
-    const now = moment.utc().startOf("day");
-    const startDate = now.clone().startOf("month");
-    const endDate = now.clone().endOf("month");
+    const now = moment().startOf("day");
+    const startDate = now.clone().subtract(1, "year").startOf("month");
+    const endDate = now.clone().add(45, "days").endOf("month");
     this.client
       .get("/bills", {
         params: {
@@ -123,27 +109,63 @@ module.exports = NodeHelper.create({
         Log.info(
           `${this.logPrefix}Bills data received. ${response.data.data.length} bills found`
         );
-        response.data.data
-          .map((b) => ({ id: b.id, ...b.attributes }))
-          .map((b) => this.getBillPayments(b))
-          .resolveAll()
-          .catch((..._) => {
-            Log.warn(`${this.logPrefix}Can't get bills data`);
-            this.busy = false;
-          })
-          .then((results) => {
-            const bills = results.sort((a, b) => this.sortResults(a, b));
-            Log.info(
-              `${this.logPrefix}Data processed for ${bills.length} bills`
+        const parsedBills = response.data.data
+          .map((b) => {
+            const bill = { id: b.id, ...b.attributes };
+            const paidDates = [...bill.paid_dates]
+              .map((pd) => this.parseDate(pd.date))
+              .sort((a, b) => this.compareDate(a, b, "desc"));
+
+            const ref1 = this.parseDate(bill.date);
+            const ref2 =
+              paidDates.length > 0
+                ? paidDates[0]
+                : now.subtract(1, "month").startOf("month");
+
+            let offset = 0;
+            while (ref1.clone().add(offset, "month") < ref2) {
+              offset++;
+            }
+            const expectedDate = ref1.clone().add(offset, "months");
+            const lastExpectedDate = ref1.clone().add(offset - 1, "months");
+            const paidThisPeriod = paidDates.filter((d) =>
+              d.isSameOrAfter(lastExpectedDate)
+            ).length;
+            const lastPayment = paidThisPeriod > 0 ? paidDates[0] : null;
+            if (lastPayment) expectedDate.add(1, "months");
+            const remaining = now.diff(
+              expectedDate.clone().subtract(1, "week"),
+              "days"
             );
-            this.notify("BILLS", bills);
-            this.busy = false;
-          });
+            const paid = remaining < 0;
+
+            return {
+              name: bill.name,
+              last_payment: lastPayment,
+              paid,
+              expected_date: expectedDate
+            };
+          })
+          .sort((a, b) => this.sortResults(a, b))
+          .map((b) =>
+            Object.entries(b).reduce(
+              (acc, [k, v]) => ({
+                ...acc,
+                [k]: moment.isMoment(v) ? v.format("MMM Do") : v
+              }),
+              {}
+            )
+          );
+        Log.info(
+          `${this.logPrefix}Data processed for ${parsedBills.length} bills`
+        );
+        this.notify("BILLS", parsedBills);
       })
       .catch((..._) => {
         Log.warn(`${this.logPrefix}Can't get bills data`);
-        this.busy = false;
-      });
+        Log.error(_);
+      })
+      .finally(() => (this.busy = false));
   },
 
   notificationReceived(notification, payload) {
