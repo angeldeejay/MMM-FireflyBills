@@ -137,7 +137,7 @@ module.exports = NodeHelper.create({
               expectedDate.clone().subtract(1, "week"),
               "days"
             );
-            const paid = remaining < 0;
+            const paid = remaining < 0 && remaining < 0;
 
             return {
               name: bill.name,
