@@ -92,7 +92,7 @@ module.exports = NodeHelper.create({
     return 0;
   },
 
-  parseBill(b) {
+  parseBill(b, now) {
     const parseDate = (date) => {
       return moment(date, FF_DATETIME_FMT);
     };
@@ -133,9 +133,9 @@ module.exports = NodeHelper.create({
     };
   },
 
-  parseBills(response) {
+  parseBills(response, now) {
     return response.data.data
-      .map((b) => this.parseBill(b))
+      .map((b) => this.parseBill(b, now))
       .sort((a, b) => this.sortResults(a, b))
       .map((b) =>
         Object.entries(b).reduce(
@@ -176,7 +176,7 @@ module.exports = NodeHelper.create({
         this.checkBillsResponse(response);
         const found = response.data.data.length;
         this.info(`Bills data received. ${found} bills found`);
-        const parsedBills = this.parseBills(response);
+        const parsedBills = this.parseBills(response, now);
         this.info(`Data processed for ${parsedBills.length} bills`);
         this.notify("BILLS", parsedBills);
       })
