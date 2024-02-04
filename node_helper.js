@@ -68,10 +68,6 @@ module.exports = NodeHelper.create({
     return a.paid ? (b.paid ? 0 : 1) : -1;
   },
 
-  parseDate(date) {
-    return moment(date, FF_DATETIME_FMT);
-  },
-
   compareFields(a, b, f) {
     switch (f) {
       case "paid":
@@ -97,12 +93,16 @@ module.exports = NodeHelper.create({
   },
 
   parseBill(b) {
+    const parseDate = (date) => {
+      return moment(date, FF_DATETIME_FMT);
+    };
+
     const bill = { id: b.id, ...b.attributes };
     const paidDates = [...bill.paid_dates]
-      .map((pd) => this.parseDate(pd.date))
+      .map((pd) => parseDate(pd.date))
       .sort((a, b) => this.compareDate(a, b, "desc"));
 
-    const ref1 = this.parseDate(bill.date);
+    const ref1 = parseDate(bill.date);
     const ref2 =
       paidDates.length > 0
         ? paidDates[0]
