@@ -29,7 +29,23 @@ module.exports = NodeHelper.create({
     this.lang = this.getMmConfig().language || "en";
     moment.updateLocale(this.lang);
     moment.locale(this.lang);
-    Log.log(`${this.logPrefix}Helper started`);
+    this.log("Helper started");
+  },
+
+  log(...args) {
+    Log.log(this.logPrefix + args[0], ...args.slice(1));
+  },
+
+  info(...args) {
+    Log.info(this.logPrefix + args[0], ...args.slice(1));
+  },
+
+  warn(...args) {
+    Log.warn(this.logPrefix + args[0], ...args.slice(1));
+  },
+
+  error(...args) {
+    Log.error(...args);
   },
 
   getMmConfig() {
@@ -80,8 +96,72 @@ module.exports = NodeHelper.create({
     return 0;
   },
 
+  parseBill(b) {
+    const bill = { id: b.id, ...b.attributes };
+    const paidDates = [...bill.paid_dates]
+      .map((pd) => this.parseDate(pd.date))
+      .sort((a, b) => this.compareDate(a, b, "desc"));
+
+    const ref1 = this.parseDate(bill.date);
+    const ref2 =
+      paidDates.length > 0
+        ? paidDates[0]
+        : now.subtract(1, "month").startOf("month");
+
+    let offset = 0;
+    while (ref1.clone().add(offset, "month") < ref2) {
+      offset++;
+    }
+    const expectedDate = ref1.clone().add(offset, "months");
+    const lastExpectedDate = ref1.clone().add(offset - 1, "months");
+    const paidThisPeriod = paidDates.filter((d) =>
+      d.isSameOrAfter(lastExpectedDate)
+    ).length;
+    const lastPayment = paidThisPeriod > 0 ? paidDates[0] : null;
+    if (lastPayment) expectedDate.add(1, "months");
+    const remaining = now.diff(
+      expectedDate.clone().subtract(2, "days"),
+      "days"
+    );
+    const paid = remaining < 0 && remaining < 0;
+
+    return {
+      name: bill.name,
+      last_payment: lastPayment,
+      paid,
+      expected_date: expectedDate
+    };
+  },
+
+  parseBills(response) {
+    return response.data.data
+      .map(this.parseBill)
+      .sort((a, b) => this.sortResults(a, b))
+      .map((b) =>
+        Object.entries(b).reduce(
+          (acc, [k, v]) => ({
+            ...acc,
+            [k]: moment.isMoment(v) ? v.format("MMM Do") : v
+          }),
+          {}
+        )
+      );
+  },
+
+  checkBillsResponse(response) {
+    if (
+      typeof response === "undefined" ||
+      response === null ||
+      typeof response.data === "undefined" ||
+      response.data === null ||
+      typeof response.data.data === "undefined" ||
+      !["array", "object"].includes(typeof response.data.data)
+    )
+      throw new Error("Invalid bills response from Firefly III server");
+  },
+
   getBills() {
-    Log.info(`${this.logPrefix}Requesting bills`);
+    this.info("Requesting bills");
     const now = moment().startOf("day");
     const startDate = now.clone().subtract(1, "year").startOf("month");
     const endDate = now.clone().add(45, "days").endOf("month");
@@ -93,77 +173,16 @@ module.exports = NodeHelper.create({
         }
       })
       .then((response) => {
-        if (
-          typeof response === "undefined" ||
-          response === null ||
-          typeof response.data === "undefined" ||
-          response.data === null ||
-          typeof response.data.data === "undefined" ||
-          !["array", "object"].includes(typeof response.data.data)
-        ) {
-          Log.warn(`${this.logPrefix}Can't get bills data`);
-          this.busy = false;
-          return;
-        }
-
-        Log.info(
-          `${this.logPrefix}Bills data received. ${response.data.data.length} bills found`
-        );
-        const parsedBills = response.data.data
-          .map((b) => {
-            const bill = { id: b.id, ...b.attributes };
-            const paidDates = [...bill.paid_dates]
-              .map((pd) => this.parseDate(pd.date))
-              .sort((a, b) => this.compareDate(a, b, "desc"));
-
-            const ref1 = this.parseDate(bill.date);
-            const ref2 =
-              paidDates.length > 0
-                ? paidDates[0]
-                : now.subtract(1, "month").startOf("month");
-
-            let offset = 0;
-            while (ref1.clone().add(offset, "month") < ref2) {
-              offset++;
-            }
-            const expectedDate = ref1.clone().add(offset, "months");
-            const lastExpectedDate = ref1.clone().add(offset - 1, "months");
-            const paidThisPeriod = paidDates.filter((d) =>
-              d.isSameOrAfter(lastExpectedDate)
-            ).length;
-            const lastPayment = paidThisPeriod > 0 ? paidDates[0] : null;
-            if (lastPayment) expectedDate.add(1, "months");
-            const remaining = now.diff(
-              expectedDate.clone().subtract(1, "week"),
-              "days"
-            );
-            const paid = remaining < 0 && remaining < 0;
-
-            return {
-              name: bill.name,
-              last_payment: lastPayment,
-              paid,
-              expected_date: expectedDate
-            };
-          })
-          .sort((a, b) => this.sortResults(a, b))
-          .map((b) =>
-            Object.entries(b).reduce(
-              (acc, [k, v]) => ({
-                ...acc,
-                [k]: moment.isMoment(v) ? v.format("MMM Do") : v
-              }),
-              {}
-            )
-          );
-        Log.info(
-          `${this.logPrefix}Data processed for ${parsedBills.length} bills`
-        );
+        this.checkBillsResponse(response);
+        const found = response.data.data.length;
+        this.info(`Bills data received. ${found} bills found`);
+        const parsedBills = this.parseBills(response);
+        this.info(`Data processed for ${parsedBills.length} bills`);
         this.notify("BILLS", parsedBills);
       })
       .catch((..._) => {
-        Log.warn(`${this.logPrefix}Can't get bills data`);
-        Log.error(_);
+        this.warn("Can't get bills data");
+        this.error(_);
       })
       .finally(() => (this.busy = false));
   },

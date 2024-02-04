@@ -1,6 +1,6 @@
 {
   "name": "MMM-FireflyBills",
-  "version": "3.0.1",
+  "version": "3.1.0",
   "description": "MagicMirror module to display a list of bills from FireFly III",
   "main": "MMM-FireflyBills.js",
   "author": "Andrés Vanegas <ukab72106@gmail.com>",
