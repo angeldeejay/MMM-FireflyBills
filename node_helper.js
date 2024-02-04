@@ -135,7 +135,7 @@ module.exports = NodeHelper.create({
 
   parseBills(response) {
     return response.data.data
-      .map(this.parseBill)
+      .map((b) => this.parseBill(b))
       .sort((a, b) => this.sortResults(a, b))
       .map((b) =>
         Object.entries(b).reduce(
