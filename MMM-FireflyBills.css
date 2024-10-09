@@ -51,3 +51,7 @@
 .paid-bill .cell {
   background-color: rgba(0, 255, 0, 0.24);
 }
+
+.MMM-FireflyBills .cell.center {
+  text-align: center !important;
+}

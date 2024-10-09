@@ -85,6 +85,7 @@ Module.register("MMM-FireflyBills", {
       const valueToDisplay = this.formatValue(k, value);
       const cellText = document.createTextNode(valueToDisplay);
       column.appendChild(cellText);
+      column.classList[valueToDisplay === "-" ? "add" : "remove"]("center");
       row.appendChild(column);
     });
 
