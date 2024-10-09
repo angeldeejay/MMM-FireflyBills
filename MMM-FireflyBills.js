@@ -107,7 +107,7 @@ Module.register("MMM-FireflyBills", {
     switch (key) {
       case "last_payment":
       case "expected_date":
-        return this.capitalize(value);
+        return value ? this.capitalize(value) : "-";
       case "paid":
         return "";
       default:
