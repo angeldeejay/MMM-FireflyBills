@@ -133,8 +133,8 @@ module.exports = NodeHelper.create({
     };
   },
 
-  parseBills(response, now) {
-    return response.data.data
+  parseBills(data, now) {
+    return data
       .map((b) => this.parseBill(b, now))
       .sort((a, b) => this.sortResults(a, b))
       .map((b) =>
@@ -174,9 +174,10 @@ module.exports = NodeHelper.create({
       })
       .then((response) => {
         this.checkBillsResponse(response);
-        const found = response.data.data.length;
+        const rawBills = response.data.data.filter((b) => b.active === true);
+        const found = rawBills.length;
         this.info(`Bills data received. ${found} bills found`);
-        const parsedBills = this.parseBills(response, now);
+        const parsedBills = this.parseBills(rawBills, now);
         this.info(`Data processed for ${parsedBills.length} bills`);
         this.notify("BILLS", parsedBills);
       })
