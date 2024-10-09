@@ -174,7 +174,9 @@ module.exports = NodeHelper.create({
       })
       .then((response) => {
         this.checkBillsResponse(response);
-        const rawBills = response.data.data.filter((b) => b.active === true);
+        const rawBills = response.data.data.filter(
+          (b) => b.attributes.active === true
+        );
         const found = rawBills.length;
         this.info(`Bills data received. ${found} bills found`);
         const parsedBills = this.parseBills(rawBills, now);
