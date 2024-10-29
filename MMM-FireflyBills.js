@@ -79,14 +79,19 @@ Module.register("MMM-FireflyBills", {
   getTableRow(bill) {
     const row = document.createElement("tr");
     Object.entries(bill).forEach(([k, v]) => {
-      const column = document.createElement("td");
-      column.classList.add(...this.getColumnClasses(bill, k));
-      const value = v;
-      const valueToDisplay = this.formatValue(k, value);
-      const cellText = document.createTextNode(valueToDisplay);
-      column.appendChild(cellText);
-      column.classList[valueToDisplay === "-" ? "add" : "remove"]("center");
-      row.appendChild(column);
+      if (k === "due") {
+        value = !!v;
+        row.classList[value ? "add" : "remove"]("due");
+      } else {
+        const column = document.createElement("td");
+        column.classList.add(...this.getColumnClasses(bill, k));
+        const value = v;
+        const valueToDisplay = this.formatValue(k, value);
+        const cellText = document.createTextNode(valueToDisplay);
+        column.appendChild(cellText);
+        column.classList[valueToDisplay === "-" ? "add" : "remove"]("center");
+        row.appendChild(column);
+      }
     });
 
     row.classList.add(`${bill.paid ? "" : "un"}paid-bill`);

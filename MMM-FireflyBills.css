@@ -13,19 +13,29 @@
 }
 
 .MMM-FireflyBills .paid-cell.paid {
-  color: green;
+  color: greenyellow;
 }
 
 .MMM-FireflyBills .paid-cell.paid:before {
-  content: "\f058";
+  content: "\f00c";
+  /* content: "\f058"; */
 }
 
 .MMM-FireflyBills .paid-cell.unpaid {
-  color: red;
+  color: orangered;
 }
 
 .MMM-FireflyBills .paid-cell.unpaid:before {
-  content: "\f057";
+  content: "\3f";
+  /* content: "\f057"; */
+}
+
+.MMM-FireflyBills .due .paid-cell.unpaid {
+  color: red;
+}
+
+.MMM-FireflyBills .due .paid-cell.unpaid:before {
+  content: "\f071";
 }
 
 .MMM-FireflyBills .name-cell {
@@ -35,9 +45,13 @@
 
 .MMM-FireflyBills .last-payment-cell,
 .MMM-FireflyBills .expected-date-cell {
-  text-align: left;
+  text-align: center;
   /* text-justify: distribute; */
+  text-transform: capitalize;
   font-weight: 400;
+  font-variant-numeric: tabular-nums lining-nums !important;
+  font-kerning: none !important;
+  letter-spacing: 0.075rem !important;
 }
 
 .MMM-FireflyBills .cell {
@@ -45,13 +59,36 @@
   padding-right: 0.25rem;
 }
 
-.unpaid-bill .cell {
-  background-color: rgba(255, 0, 0, 0.24);
-}
 .paid-bill .cell {
-  background-color: rgba(0, 255, 0, 0.24);
+  background-color: rgba(0, 255, 0, 0.2);
+}
+.unpaid-bill .cell {
+  background-color: rgba(255, 166, 0, 0.2);
+}
+.due .cell {
+  background-color: rgba(255, 0, 0, 0.2);
 }
 
 .MMM-FireflyBills .cell.center {
   text-align: center !important;
+}
+
+@keyframes MMM-FireflyBills-BgBlink {
+  50% {
+    background-color: transparent;
+  }
+}
+
+@keyframes MMM-FireflyBills-TextBlink {
+  50% {
+    color: transparent;
+  }
+}
+
+.MMM-FireflyBills .due .cell {
+  animation: MMM-FireflyBills-BgBlink 0.5s infinite linear !important;
+}
+
+.MMM-FireflyBills .due .paid-cell.unpaid:before {
+  animation: MMM-FireflyBills-TextBlink 0.5s infinite linear !important;
 }

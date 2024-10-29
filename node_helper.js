@@ -4,15 +4,16 @@ const axios = require("axios");
 const moment = require("moment");
 const fs = require("fs");
 const path = require("path");
+const FastSort = require("fast-sort");
 
 const FF_DATETIME_FMT = "YYYY-MM-DDTHH:mm:ssZZ";
 
-const MM_CONFIG = "/home/apps/projects/MagicMirror/config/config.js";
-// const MM_CONFIG = path.join(
-//   path.dirname(path.dirname(__dirname)),
-//   "config",
-//   "config.js"
-// );
+const MM_CONFIG = [
+  path.dirname(path.dirname(__dirname)),
+  path.join(path.dirname(__dirname), "MagicMirror")
+]
+  .map((p) => path.join(p, "config", "config.js"))
+  .reduce((acc, p) => (acc ? acc : fs.existsSync(p) ? p : acc), undefined);
 
 Object.defineProperty(Array.prototype, "resolveAll", {
   value: function () {
@@ -74,6 +75,7 @@ module.exports = NodeHelper.create({
     switch (f) {
       case "paid":
         return this.comparePaid(a, b);
+      case "last_payment":
       case "expected_date":
         return this.compareDate(a[f], b[f], "asc");
       case "name":
@@ -85,13 +87,10 @@ module.exports = NodeHelper.create({
 
   sortResults(a, b) {
     // eslint-disable-next-line no-restricted-syntax
-    for (const f of ["expected_date", "paid", "name"]) {
-      const ret = this.compareFields(a, b, f);
-      if (ret !== 0) {
-        return ret;
-      }
-    }
-    return 0;
+    return ["expected_date", "last_payment", "name", "paid"].reduce(
+      (acc, f) => acc || this.compareFields(a, b, f),
+      0
+    );
   },
 
   parseBill(b, now) {
@@ -115,6 +114,7 @@ module.exports = NodeHelper.create({
 
     const last_payment = is_first_payment ? null : paidDates[0];
 
+    let due = false;
     let paid = (is_first_payment ? expected_date : last_payment).isBetween(
       expected_date.clone().subtract(1.1, "weeks"),
       undefined,
@@ -124,28 +124,43 @@ module.exports = NodeHelper.create({
 
     if (paid) {
       expected_date.add(1, "months");
+      due = false;
     }
 
-    if (paid && expected_date.isSameOrBefore(now.clone().add(4, "days"))) {
+    if (!paid && now.isSameOrAfter(expected_date)) {
+      due = true;
+    } else if (
+      paid &&
+      expected_date.isSameOrBefore(now.clone().add(4, "days"))
+    ) {
       paid = false;
     }
 
-    return { name, last_payment, paid, expected_date };
+    return { name, last_payment, paid, expected_date, due };
   },
 
   parseBills(data, now) {
-    return data
-      .map((b) => this.parseBill(b, now))
-      .sort((a, b) => this.sortResults(a, b))
+    const output = FastSort.sort(data.map((b) => this.parseBill(b, now)))
+      .by([
+        { desc: (b) => b.due },
+        { asc: (b) => b.expected_date.format("X") },
+        { asc: (b) => (b.last_payment ? b.last_payment.format("X") : 0) },
+        { asc: (b) => b.paid },
+        { asc: (b) => b.name }
+      ])
       .map((b) =>
         Object.entries(b).reduce(
           (acc, [k, v]) => ({
             ...acc,
-            [k]: moment.isMoment(v) ? v.format("MMM Do") : v
+            [k]: moment.isMoment(v) ? v.format("MMM DD").replaceAll(".", "") : v
           }),
           {}
         )
       );
+    for (const bill of output) {
+      this.log(JSON.stringify(bill));
+    }
+    return output;
   },
 
   checkBillsResponse(response) {
