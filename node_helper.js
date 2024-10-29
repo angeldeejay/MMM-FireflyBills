@@ -6,11 +6,13 @@ const fs = require("fs");
 const path = require("path");
 
 const FF_DATETIME_FMT = "YYYY-MM-DDTHH:mm:ssZZ";
-const MM_CONFIG = path.join(
-  path.dirname(path.dirname(__dirname)),
-  "config",
-  "config.js"
-);
+
+const MM_CONFIG = "/home/apps/projects/MagicMirror/config/config.js";
+// const MM_CONFIG = path.join(
+//   path.dirname(path.dirname(__dirname)),
+//   "config",
+//   "config.js"
+// );
 
 Object.defineProperty(Array.prototype, "resolveAll", {
   value: function () {
@@ -83,7 +85,7 @@ module.exports = NodeHelper.create({
 
   sortResults(a, b) {
     // eslint-disable-next-line no-restricted-syntax
-    for (const f of ["paid", "expected_date", "name"]) {
+    for (const f of ["expected_date", "paid", "name"]) {
       const ret = this.compareFields(a, b, f);
       if (ret !== 0) {
         return ret;
@@ -98,39 +100,37 @@ module.exports = NodeHelper.create({
     };
 
     const bill = { id: b.id, ...b.attributes };
-    const paidDates = [...bill.paid_dates]
+    const { name, date, paid_dates } = bill;
+    const paidDates = [...paid_dates]
       .map((pd) => parseDate(pd.date))
       .sort((a, b) => this.compareDate(a, b, "desc"));
 
-    const ref1 = parseDate(bill.date);
-    const ref2 =
-      paidDates.length > 0
-        ? paidDates[0]
-        : now.subtract(1, "month").startOf("month");
+    const expected_date = parseDate(date);
+    const is_first_payment = expected_date.isAfter(now);
 
-    let offset = 0;
-    while (ref1.clone().add(offset, "month") < ref2) {
-      offset++;
+    if (!is_first_payment) {
+      expected_date.set("year", now.year());
+      expected_date.set("month", now.month());
     }
-    const expectedDate = ref1.clone().add(offset, "months");
-    const lastExpectedDate = ref1.clone().add(offset - 1, "months");
-    const paidThisPeriod = paidDates.filter((d) =>
-      d.isSameOrAfter(lastExpectedDate)
-    ).length;
-    const lastPayment = paidThisPeriod > 0 ? paidDates[0] : null;
-    if (lastPayment) expectedDate.add(1, "months");
-    const remaining = now.diff(
-      expectedDate.clone().subtract(2, "days"),
-      "days"
-    );
-    const paid = remaining < 0 && remaining < 0;
 
-    return {
-      name: bill.name,
-      last_payment: lastPayment,
-      paid,
-      expected_date: expectedDate
-    };
+    const last_payment = is_first_payment ? null : paidDates[0];
+
+    let paid = (is_first_payment ? expected_date : last_payment).isBetween(
+      expected_date.clone().subtract(1.1, "weeks"),
+      undefined,
+      undefined,
+      "[]"
+    );
+
+    if (paid) {
+      expected_date.add(1, "months");
+    }
+
+    if (paid && expected_date.isSameOrBefore(now.clone().add(4, "days"))) {
+      paid = false;
+    }
+
+    return { name, last_payment, paid, expected_date };
   },
 
   parseBills(data, now) {
@@ -164,7 +164,7 @@ module.exports = NodeHelper.create({
     this.info("Requesting bills");
     const now = moment().startOf("day");
     const startDate = now.clone().subtract(1, "year").startOf("month");
-    const endDate = now.clone().add(45, "days").endOf("month");
+    const endDate = now.clone().add(90, "days").endOf("month");
     this.client
       .get("/bills", {
         params: {
