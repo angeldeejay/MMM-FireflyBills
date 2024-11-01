@@ -161,9 +161,6 @@ module.exports = NodeHelper.create({
           {}
         )
       );
-    for (const bill of output) {
-      this.log(JSON.stringify(bill));
-    }
     return output;
   },
 
