@@ -7,6 +7,7 @@ const path = require("path");
 const FastSort = require("fast-sort");
 
 const FF_DATETIME_FMT = "YYYY-MM-DDTHH:mm:ssZZ";
+const OUTPUT_FMT = "MMM DD";
 
 const MM_CONFIG = [
   path.dirname(path.dirname(__dirname)),
@@ -94,57 +95,58 @@ module.exports = NodeHelper.create({
   },
 
   parseBill(b, now) {
-    const parseDate = (date) => {
-      return moment(date, FF_DATETIME_FMT);
-    };
-
     const bill = { id: b.id, ...b.attributes };
     const { name, date, paid_dates } = bill;
     const paidDates = [...paid_dates]
-      .map((pd) => parseDate(pd.date))
+      .map((pd) => moment(pd.date, FF_DATETIME_FMT))
       .sort((a, b) => this.compareDate(a, b, "desc"));
 
-    const expected_date = parseDate(date);
-    const is_first_payment = expected_date.isAfter(now);
+    const expectedDate = moment(date, FF_DATETIME_FMT);
+    const isBillStarting = expectedDate.isAfter(now);
+    const lastPayment = paidDates.length > 0 ? paidDates[0] : null;
 
-    if (!is_first_payment) {
-      expected_date.set("year", now.year());
-      expected_date.set("month", now.month());
+    if (!isBillStarting) {
+      const dayOfMonth = expectedDate.date();
+      expectedDate.set("year", now.year()).set("month", 0);
+      while (true) {
+        if (!lastPayment || expectedDate.isAfter(lastPayment)) break;
+        expectedDate.add(1, "months").set("date", dayOfMonth);
+      }
     }
 
-    const last_payment = is_first_payment ? null : paidDates[0];
+    const paidPeriodStart = moment(expectedDate)
+      .subtract(1, "months")
+      .subtract(1, "weeks");
 
-    let due = false;
-    let paid = (is_first_payment ? expected_date : last_payment).isBetween(
-      expected_date.clone().subtract(1.1, "weeks"),
-      undefined,
-      undefined,
-      "[]"
-    );
+    let paid = isBillStarting
+      ? true
+      : lastPayment.isSameOrAfter(paidPeriodStart);
 
     if (paid) {
-      expected_date.add(1, "months");
-      due = false;
+      if (!isBillStarting && now.isSameOrAfter(expectedDate))
+        expectedDate.add(1, "months");
+      if (now.isSameOrAfter(moment(expectedDate).subtract(1, "weeks"))) {
+        paid = false;
+      }
     }
 
-    if (!paid && now.isSameOrAfter(expected_date)) {
-      due = true;
-    } else if (
-      paid &&
-      expected_date.isSameOrBefore(now.clone().add(4, "days"))
-    ) {
-      paid = false;
-    }
+    const due = !paid && now.isSameOrAfter(expectedDate);
 
-    return { name, last_payment, paid, expected_date, due };
+    return {
+      name,
+      last_payment: lastPayment,
+      paid,
+      expected_date: expectedDate,
+      due
+    };
   },
 
   parseBills(data, now) {
     const output = FastSort.sort(data.map((b) => this.parseBill(b, now)))
       .by([
         { desc: (b) => b.due },
-        { asc: (b) => b.expected_date.format("X") },
-        { asc: (b) => (b.last_payment ? b.last_payment.format("X") : 0) },
+        { asc: (b) => b.expected_date?.format("X") },
+        { asc: (b) => (b.last_payment ? b.last_payment?.format("X") : 0) },
         { asc: (b) => b.paid },
         { asc: (b) => b.name }
       ])
@@ -152,7 +154,9 @@ module.exports = NodeHelper.create({
         Object.entries(b).reduce(
           (acc, [k, v]) => ({
             ...acc,
-            [k]: moment.isMoment(v) ? v.format("MMM DD").replaceAll(".", "") : v
+            [k]: moment.isMoment(v)
+              ? v.format(OUTPUT_FMT).replaceAll(".", "")
+              : v
           }),
           {}
         )
