@@ -123,9 +123,12 @@ module.exports = NodeHelper.create({
       : lastPayment.isSameOrAfter(paidPeriodStart);
 
     if (paid) {
-      if (!isBillStarting && now.isSameOrAfter(expectedDate))
+      let dueStart = moment(expectedDate).subtract(1, "weeks");
+      if (!isBillStarting && now.isSameOrAfter(dueStart)) {
         expectedDate.add(1, "months");
-      if (now.isSameOrAfter(moment(expectedDate).subtract(1, "weeks"))) {
+        dueStart = moment(expectedDate).subtract(1, "weeks");
+      }
+      if (now.isSameOrAfter(dueStart)) {
         paid = false;
       }
     }
