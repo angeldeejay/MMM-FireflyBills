@@ -102,7 +102,7 @@ module.exports = NodeHelper.create({
       .sort((a, b) => this.compareDate(a, b, "desc"));
 
     const expectedDate = moment(date, FF_DATETIME_FMT);
-    const isBillStarting = expectedDate.isAfter(now);
+    const isBillStarting = expectedDate.isAfter(now) || paidDates.length === 0;
     const lastPayment = paidDates.length > 0 ? paidDates[0] : null;
 
     if (!isBillStarting) {
