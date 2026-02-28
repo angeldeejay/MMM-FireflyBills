@@ -86,10 +86,15 @@ Module.register("MMM-FireflyBills", {
 
     if (!isBillStarting) {
       const dayOfMonth = expectedDate.date();
+      const lastDayOfMonth =
+        moment(expectedDate).endOf("month").startOf("day").date() ===
+          dayOfMonth || dayOfMonth >= 30;
       expectedDate.set("year", now.year()).set("month", 0);
+      if (lastDayOfMonth) expectedDate.endOf("month").startOf("day");
       while (true) {
         if (!lastPayment || expectedDate.isAfter(lastPayment)) break;
         expectedDate.add(1, "months").set("date", dayOfMonth);
+        if (lastDayOfMonth) expectedDate.endOf("month").startOf("day");
       }
     }
 
