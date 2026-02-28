@@ -81,39 +81,34 @@ module.exports = NodeHelper.create({
   },
 
   async getBills() {
-    const now = moment().startOf("day");
-    const startDate = now.clone().subtract(1, "year").startOf("month");
-    const endDate = now.clone().add(90, "days").endOf("month");
-    await this.client
-      .get("/bills", {
+    try {
+      const now = moment().startOf("day");
+      const startDate = now.clone().subtract(1, "year").startOf("month");
+      const endDate = now.clone().add(90, "days").endOf("month");
+      const response = await this.client.get("/bills", {
         params: {
           start: startDate.format("YYYY-MM-DD"),
           end: endDate.format("YYYY-MM-DD")
         }
-      })
-      .then((response) => {
-        this.checkBillsResponse(response);
-        const bills = response.data.data.filter(
-          (b) => b.attributes.active === true
-        );
-        if (
-          !this.ready ||
-          JSON.stringify(this.bills) !== JSON.stringify(bills)
-        ) {
-          this.bills = bills;
-          const found = this.bills.length;
-          this.info(`Bills updates received. ${found} bills found`);
-        }
-        this.ready = true;
-      })
-      .catch((..._) => {
-        this.warn("Can't get bills data");
-        this.bills = [];
-        this.error(_);
-      })
-      .finally(() => {
-        this.busy = false;
       });
+
+      this.checkBillsResponse(response);
+      const bills = response.data.data.filter(
+        (b) => b.attributes.active === true
+      );
+      if (!this.ready || JSON.stringify(this.bills) !== JSON.stringify(bills)) {
+        this.bills = bills;
+        const found = this.bills.length;
+        this.info(`Bills updates received. ${found} bills found`);
+      }
+      this.ready = true;
+    } catch (err) {
+      this.warn("Can't get bills data");
+      this.bills = [];
+      this.error(err);
+    } finally {
+      this.busy = false;
+    }
   },
 
   sendBills() {
@@ -137,7 +132,9 @@ module.exports = NodeHelper.create({
       case "GET_BILLS":
         if (!this.busy) {
           this.busy = true;
-          await this.getBills();
+          await this.getBills()
+            .then(() => void 0)
+            .catch(() => void 0);
         }
 
         if (this.ready) {
