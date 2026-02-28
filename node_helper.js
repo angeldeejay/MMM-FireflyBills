@@ -23,8 +23,10 @@ module.exports = NodeHelper.create({
   client: null,
   logPrefix: null,
   bills: [],
+  ready: false,
 
   start() {
+    this.ready = false;
     this.bills = [];
     this.logPrefix = `${this.name} :: `;
     this.log("Helper started");
@@ -95,6 +97,7 @@ module.exports = NodeHelper.create({
         const found = bills.length;
         this.info(`Bills data received. ${found} bills found`);
         this.bills = bills;
+        this.ready = true;
       })
       .catch((..._) => {
         this.warn("Can't get bills data");
@@ -102,11 +105,6 @@ module.exports = NodeHelper.create({
         this.error(_);
       })
       .finally(() => {
-        this.notify(
-          "BILLS",
-          this.bills.map((b) => ({ id: b.id, ...b.attributes }))
-        );
-
         this.busy = false;
       });
   },
@@ -121,12 +119,18 @@ module.exports = NodeHelper.create({
             Authorization: `Bearer ${payload.token}`
           }
         });
-        this.getBills();
         break;
       case "GET_BILLS":
-        if (this.busy) {
+        if (!this.busy) {
           this.busy = true;
           this.getBills();
+        }
+
+        if (this.ready) {
+          this.notify(
+            "BILLS",
+            this.bills.map((b) => ({ id: b.id, ...b.attributes }))
+          );
         }
         break;
       default:
