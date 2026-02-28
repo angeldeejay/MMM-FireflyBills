@@ -158,14 +158,15 @@ Module.register("MMM-FireflyBills", {
     switch (notification) {
       case `${this.name}_VERSION`:
         console.log(`${this.name} :: Version: ${payload}`);
-        setInterval(() => this.getBills(), this.config.updateInterval);
         this.getBills();
         break;
       case `${this.name}_BILLS`:
         this.jsonData = this.parseBills(payload, moment());
         this.updateDom(this.config.animationSpeed);
+        setTimeout(() => this.getBills(), this.config.updateInterval);
         break;
       default:
+        break;
     }
   },
 
