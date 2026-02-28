@@ -126,13 +126,13 @@ module.exports = NodeHelper.create({
   async notificationReceived(notification, payload) {
     switch (notification) {
       case "GET_VERSION":
-        this.notify("VERSION", this.getVersion());
         this.client = axios.create({
           baseURL: `${payload.url}/api/v1/`,
           headers: {
             Authorization: `Bearer ${payload.token}`
           }
         });
+        this.notify("VERSION", this.getVersion());
         break;
       case "GET_BILLS":
         if (!this.busy) {
