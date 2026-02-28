@@ -24,9 +24,12 @@ module.exports = NodeHelper.create({
   logPrefix: null,
   bills: [],
   ready: false,
+  busy: false,
 
   start() {
+    this.client = null;
     this.ready = false;
+    this.busy = false;
     this.bills = [];
     this.logPrefix = `${this.name} :: `;
     this.log("Helper started");
@@ -77,12 +80,11 @@ module.exports = NodeHelper.create({
     return p.version;
   },
 
-  getBills() {
-    this.info("Requesting bills");
+  async getBills() {
     const now = moment().startOf("day");
     const startDate = now.clone().subtract(1, "year").startOf("month");
     const endDate = now.clone().add(90, "days").endOf("month");
-    this.client
+    await this.client
       .get("/bills", {
         params: {
           start: startDate.format("YYYY-MM-DD"),
@@ -94,9 +96,14 @@ module.exports = NodeHelper.create({
         const bills = response.data.data.filter(
           (b) => b.attributes.active === true
         );
-        const found = bills.length;
-        this.info(`Bills data received. ${found} bills found`);
-        this.bills = bills;
+        if (
+          !this.ready ||
+          JSON.stringify(this.bills) !== JSON.stringify(bills)
+        ) {
+          this.bills = bills;
+          const found = this.bills.length;
+          this.info(`Bills updates received. ${found} bills found`);
+        }
         this.ready = true;
       })
       .catch((..._) => {
@@ -109,7 +116,14 @@ module.exports = NodeHelper.create({
       });
   },
 
-  notificationReceived(notification, payload) {
+  sendBills() {
+    this.notify(
+      "BILLS",
+      this.bills.map((b) => ({ id: b.id, ...b.attributes }))
+    );
+  },
+
+  async notificationReceived(notification, payload) {
     switch (notification) {
       case "GET_VERSION":
         this.notify("VERSION", this.getVersion());
@@ -123,14 +137,11 @@ module.exports = NodeHelper.create({
       case "GET_BILLS":
         if (!this.busy) {
           this.busy = true;
-          this.getBills();
+          await this.getBills();
         }
 
         if (this.ready) {
-          this.notify(
-            "BILLS",
-            this.bills.map((b) => ({ id: b.id, ...b.attributes }))
-          );
+          this.sendBills();
         }
         break;
       default:

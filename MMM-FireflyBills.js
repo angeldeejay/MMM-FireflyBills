@@ -161,8 +161,14 @@ Module.register("MMM-FireflyBills", {
         this.getBills();
         break;
       case `${this.name}_BILLS`:
-        this.jsonData = this.parseBills(payload, moment());
-        this.updateDom(this.config.animationSpeed);
+        const jsonData = this.parseBills(payload, moment());
+        if (
+          !this.jsonData ||
+          JSON.stringify(this.jsonData) !== JSON.stringify(jsonData)
+        ) {
+          this.jsonData = jsonData;
+          this.updateDom(this.config.animationSpeed);
+        }
         setTimeout(() => this.getBills(), this.config.updateInterval);
         break;
       default:
