@@ -118,7 +118,7 @@ module.exports = NodeHelper.create({
     );
   },
 
-  async notificationReceived(notification, payload) {
+  notificationReceived(notification, payload) {
     switch (notification) {
       case "GET_VERSION":
         this.client = axios.create({
@@ -130,16 +130,18 @@ module.exports = NodeHelper.create({
         this.notify("VERSION", this.getVersion());
         break;
       case "GET_BILLS":
-        if (!this.busy) {
-          this.busy = true;
-          await this.getBills()
-            .then(() => void 0)
-            .catch(() => void 0);
+        if (this.busy) {
+          return;
         }
 
-        if (this.ready) {
-          this.sendBills();
-        }
+        this.busy = true;
+        this.getBills()
+          .then(() => void 0)
+          .catch(() => void 0)
+          .finally(() => {
+            this.busy = false;
+            this.sendBills();
+          });
         break;
       default:
         break;
