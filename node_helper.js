@@ -3,20 +3,6 @@ const Log = require("logger");
 const axios = require("axios");
 const moment = require("moment");
 const fs = require("fs");
-const path = require("path");
-
-const MM_CONFIG = [
-  path.dirname(path.dirname(__dirname)),
-  path.join(path.dirname(__dirname), "MagicMirror")
-]
-  .map((p) => path.join(p, "config", "config.js"))
-  .reduce((acc, p) => (acc ? acc : fs.existsSync(p) ? p : acc), undefined);
-
-Object.defineProperty(Array.prototype, "resolveAll", {
-  value: function () {
-    return Promise.all(this);
-  }
-});
 
 module.exports = NodeHelper.create({
   name: __dirname.replace("\\", "/").split("/").pop(),
@@ -51,14 +37,6 @@ module.exports = NodeHelper.create({
     Log.error(this.logPrefix + args[0], ...args.slice(1));
   },
 
-  getMmConfig() {
-    return eval(
-      `function __getConfig(){\n${fs.readFileSync(MM_CONFIG, {
-        encoding: "utf8"
-      })};\nreturn config;\n}\n__getConfig();`
-    );
-  },
-
   notify(notification, payload) {
     this.sendSocketNotification(`${this.name}_${notification}`, payload);
   },
@@ -83,7 +61,7 @@ module.exports = NodeHelper.create({
   async getBills() {
     try {
       const now = moment().startOf("day");
-      const startDate = now.clone().subtract(1, "year").startOf("month");
+      const startDate = now.clone().subtract(3, "years").startOf("month");
       const endDate = now.clone().add(90, "days").endOf("month");
       const response = await this.client.get("/bills", {
         params: {
@@ -103,8 +81,7 @@ module.exports = NodeHelper.create({
       }
       this.ready = true;
     } catch (err) {
-      this.warn("Can't get bills data");
-      this.bills = [];
+      this.warn("Can't get bills data — keeping last known state");
       this.error(err);
     } finally {
       this.busy = false;
@@ -130,7 +107,11 @@ module.exports = NodeHelper.create({
         this.notify("VERSION", this.getVersion());
         break;
       case "GET_BILLS":
+        if (!this.client) {
+          return;
+        }
         if (this.busy) {
+          this.sendBills();
           return;
         }
 

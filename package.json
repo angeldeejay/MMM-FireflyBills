@@ -1,6 +1,6 @@
 {
   "name": "MMM-FireflyBills",
-  "version": "4.1.0",
+  "version": "4.2.0",
   "description": "MagicMirror module to display a list of bills from FireFly III",
   "main": "MMM-FireflyBills.js",
   "author": "Andrés Vanegas <ukab72106@gmail.com>",
@@ -9,14 +9,18 @@
     "url": "https://github.com/angeldeejay/MMM-FireflyBills"
   },
   "devDependencies": {
+    "jest": "^29.7.0",
     "prettier": "^3.8.1"
   },
   "scripts": {
+    "format": "prettier --write .",
     "lint": "prettier --check .",
-    "lint:fix": "prettier --write .",
-    "test": "npm run lint"
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "test:lint": "npm run lint"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.2.0",
     "axios": "^1.13.6",
     "fast-sort": "^3.4.1",
     "moment": "^2.30.1"
