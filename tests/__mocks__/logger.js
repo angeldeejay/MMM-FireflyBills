@@ -1,6 +1,10 @@
+/**
+ * @fileoverview Vitest mock for MagicMirror's `logger` global.
+ * Replaces all log methods with no-op vi.fn() spies.
+ */
 module.exports = {
-  log: jest.fn(),
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn()
+  log: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn()
 };

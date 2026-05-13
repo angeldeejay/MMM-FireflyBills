@@ -1,0 +1,17 @@
+{
+	"position": "middle_center",
+	"classes": "",
+	"header": "Bills",
+	"animateIn": "",
+	"animateOut": "",
+	"hiddenOnStartup": false,
+	"disabled": false,
+	"configDeepMerge": false,
+	"config": {
+		"url": "http://localhost:9696",
+		"token": "mock-token",
+		"updateInterval": 1000,
+		"animationSpeed": 0,
+		"showValues": true
+	}
+}

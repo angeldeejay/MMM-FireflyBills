@@ -1,26 +1,17 @@
+/**
+ * @fileoverview Tests for lib/billParser.js — covers both parseBill() and parseBills().
+ *
+ * parseBill()  — single-bill classification (Groups A–G)
+ * parseBills() — array parsing, sort order, and output serialization (Group P)
+ */
+
 const moment = require("moment");
-const { parseBill } = require("../lib/billParser");
+const { parseBill, parseBills } = require("../lib/billParser");
+const { FF, cfg, mkBill, mkNow } = require("./helpers/billParser");
 
-const FF = "YYYY-MM-DDTHH:mm:ssZZ";
-const cfg = { paid: { weeks: -3 }, almost: { weeks: -1 } };
+// ─── parseBill ────────────────────────────────────────────────────────────────
 
-function mkBill(dateStr, paidDates = []) {
-  return {
-    name: "Electric",
-    date: moment(dateStr, "YYYY-MM-DD").format(FF),
-    paid_dates: paidDates.map((d) => ({
-      date: moment(d, "YYYY-MM-DD").format(FF)
-    }))
-  };
-}
-
-function mkNow(dateStr) {
-  return moment(dateStr, "YYYY-MM-DD").startOf("day");
-}
-
-// ─── Group A: Future bills (not yet active) ───────────────────────────────────
-
-describe("parseBill — future bill", () => {
+describe("parseBill — future bill (Case 1)", () => {
   test("A1: bill tomorrow → paid:true, due:false, last_payment:null", () => {
     const r = parseBill(mkBill("2024-03-15"), mkNow("2024-03-14"), cfg);
     expect(r.paid).toBe(true);
@@ -30,9 +21,8 @@ describe("parseBill — future bill", () => {
   });
 
   test("A2: bill today → falls into normal logic (not short-circuited by future guard)", () => {
-    // billDate == now → isAfter(now) = false, isSameOrAfter(lastDue) = true → new bill
     const r = parseBill(mkBill("2024-03-14"), mkNow("2024-03-14"), cfg);
-    expect(r.paid).toBe(true); // new bill → paidThisPeriod
+    expect(r.paid).toBe(true);
     expect(r.due).toBe(false);
   });
 
@@ -44,11 +34,8 @@ describe("parseBill — future bill", () => {
   });
 });
 
-// ─── Group B: No payments ─────────────────────────────────────────────────────
-
-describe("parseBill — no payments recorded", () => {
-  test("B1: due 15th, now=Mar10 → unpaid, overdue (lastDue=Feb15)", () => {
-    // Mar 15 > Mar 10 → lastDue = Feb 15; now=Mar10 is after Feb15 → due:true
+describe("parseBill — no payments recorded (Case 5 overdue)", () => {
+  test("B1: due 15th, now=Mar10 → overdue (lastDue=Feb15)", () => {
     const r = parseBill(mkBill("2023-01-15"), mkNow("2024-03-10"), cfg);
     expect(r.paid).toBe(false);
     expect(r.due).toBe(true);
@@ -71,26 +58,26 @@ describe("parseBill — no payments recorded", () => {
   });
 });
 
-// ─── Group C: With payments ───────────────────────────────────────────────────
-
-describe("parseBill — with payments", () => {
-  test("C1: paid this period, inside almost window → paid:false (almost due)", () => {
-    // lastDue=Feb15, nextDue=Mar15, almostStart=Mar8, now=Mar10 → almost
+describe("parseBill — with payments (Cases 3 & 4)", () => {
+  test("C1: payment within 1w of nextDue → advance (Case 3) → nextNextDue", () => {
+    // lastDue=Feb15, nextDue=Mar15, advanceWindowStart=Mar8
+    // payment=Mar10 >= Mar8 → advance → nextNextDue=Apr15
     const r = parseBill(
-      mkBill("2023-01-15", ["2024-03-05"]),
+      mkBill("2023-01-15", ["2024-03-10"]),
       mkNow("2024-03-10"),
       cfg
     );
-    expect(r.paid).toBe(false);
+    expect(r.paid).toBe(true);
     expect(r.due).toBe(false);
-    expect(r.expected_date.format("YYYY-MM-DD")).toBe("2024-03-15");
+    expect(r.expected_date.format("YYYY-MM-DD")).toBe("2024-04-15");
   });
 
-  test("C2: paid this period, before almost window → paid:true", () => {
-    // same as C1 but now=Mar01 (before almostStart Mar8)
+  test("C2: payment >1w before nextDue → lastDuePaid (Case 4), NOT advance → nextDue", () => {
+    // lastDue=Feb15, nextDue=Mar15, advanceWindowStart=Mar8
+    // payment=Mar05 < Mar8 → NOT advance; paymentWindowStart=Jan25, Mar05>=Jan25 → lastDuePaid
     const r = parseBill(
       mkBill("2023-01-15", ["2024-03-05"]),
-      mkNow("2024-03-01"),
+      mkNow("2024-02-20"),
       cfg
     );
     expect(r.paid).toBe(true);
@@ -98,21 +85,20 @@ describe("parseBill — with payments", () => {
     expect(r.expected_date.format("YYYY-MM-DD")).toBe("2024-03-15");
   });
 
-  test("C3: payment on exact window boundary (paymentWindowStart) → paidThisPeriod:true", () => {
-    // lastDue=Feb15, paymentWindowStart = Feb15 - 3w = Jan25
-    // payment exactly Jan 25
+  test("C3: payment on exact paymentWindowStart boundary → covers current cycle", () => {
+    // lastDue=Feb15, paymentWindowStart=Jan25; payment exactly Jan25
     const r = parseBill(
       mkBill("2023-01-15", ["2024-01-25"]),
       mkNow("2024-02-01"),
       cfg
     );
-    expect(r.paid).toBe(true); // inside almost? nextDue=Feb15, almostStart=Feb8, now=Feb01 → paid:true
+    expect(r.paid).toBe(true);
   });
 
-  test("C4: payment one day before window → paidThisPeriod:false", () => {
-    // paymentWindowStart = Jan 25; payment = Jan 24
+  test("C4: payment one day before paymentWindowStart → overdue", () => {
+    // lastDue=Jan15, paymentWindowStart=Dec25; payment=Dec24 < Dec25 → overdue
     const r = parseBill(
-      mkBill("2023-01-15", ["2024-01-24"]),
+      mkBill("2023-01-15", ["2023-12-24"]),
       mkNow("2024-02-10"),
       cfg
     );
@@ -129,16 +115,14 @@ describe("parseBill — with payments", () => {
   });
 });
 
-// ─── Group D: End-of-month bills (regression for Bug 5) ──────────────────────
-
-describe("parseBill — end-of-month bills (Bug 5 regression)", () => {
-  test("D1: bill 31st, now=Feb20 (leap) → lastDue=Jan31, nextDue=Feb29", () => {
+describe("parseBill — end-of-month clamping (Bug 5 regression)", () => {
+  test("D1: bill 31st, now=Feb20 (leap) → lastDue=Jan31", () => {
     const r = parseBill(mkBill("2023-01-31"), mkNow("2024-02-20"), cfg);
     expect(r.expected_date.format("YYYY-MM-DD")).toBe("2024-01-31");
-    expect(r.due).toBe(true); // Jan31 < Feb20
+    expect(r.due).toBe(true);
   });
 
-  test("D2: bill 31st, now=Feb29 (leap boundary) → lastDue=Feb29, due:true", () => {
+  test("D2: bill 31st, now=Feb29 (leap boundary) → lastDue=Feb29", () => {
     const r = parseBill(mkBill("2023-01-31"), mkNow("2024-02-29"), cfg);
     expect(r.expected_date.format("YYYY-MM-DD")).toBe("2024-02-29");
     expect(r.due).toBe(true);
@@ -150,52 +134,42 @@ describe("parseBill — end-of-month bills (Bug 5 regression)", () => {
     expect(r.due).toBe(true);
   });
 
-  test("D4: bill day=30 (>= 30) → isEndOfMonth behavior", () => {
-    // day 30 triggers isEndOfMonth=true in feb → due = endOf Feb
+  test("D4: bill day=30 in 31-day month → min(30,31)=30, NOT endOfMonth", () => {
     const r = parseBill(mkBill("2023-01-30"), mkNow("2024-02-15"), cfg);
-    // thisMonthDue = endOf Feb = Feb29; Feb29 > Feb15 → lastDue = Jan31
-    expect(r.expected_date.format("YYYY-MM-DD")).toBe("2024-01-31");
+    expect(r.expected_date.format("YYYY-MM-DD")).toBe("2024-01-30");
     expect(r.due).toBe(true);
   });
 
-  test("D5: bill day=29 (not isEndOfMonth) → caps at daysInMonth", () => {
-    // non-leap Feb: min(29, 28) = 28
+  test("D5: bill day=29, non-leap Feb → clamps to 28", () => {
     const r = parseBill(mkBill("2023-01-29"), mkNow("2023-02-28"), cfg);
     expect(r.expected_date.format("YYYY-MM-DD")).toBe("2023-02-28");
   });
 
-  test("D6: bill day=29, leap Feb → min(29, 29) = 29", () => {
+  test("D6: bill day=29, leap Feb → min(29,29)=29", () => {
     const r = parseBill(mkBill("2023-01-29"), mkNow("2024-02-29"), cfg);
     expect(r.expected_date.format("YYYY-MM-DD")).toBe("2024-02-29");
   });
 });
 
-// ─── Group E: Bill started recently ──────────────────────────────────────────
-
-describe("parseBill — new bill (started on or after lastDue)", () => {
-  test("E1: bill starts after lastDue → paidThisPeriod:true regardless of paid_dates", () => {
-    // bill.date = Mar 6, lastDue = Mar 5 → isSameOrAfter → true
+describe("parseBill — new bill started on/after lastDue (Case 2)", () => {
+  test("E1: bill.date after lastDue → paid:true, last_payment:null", () => {
     const r = parseBill(mkBill("2024-03-06"), mkNow("2024-03-10"), cfg);
     expect(r.paid).toBe(true);
     expect(r.due).toBe(false);
     expect(r.last_payment).toBeNull();
   });
 
-  test("E2: bill starts same day as lastDue → isSameOrAfter → paidThisPeriod:true", () => {
-    // bill.date = Mar 5, lastDue = Mar 5 → same day counts as new
+  test("E2: bill.date same day as lastDue → isSameOrAfter → paid:true", () => {
     const r = parseBill(mkBill("2024-03-05"), mkNow("2024-03-10"), cfg);
-    expect(r.paid).toBe(true); // or false depending on almostStart
+    expect(r.paid).toBe(true);
     expect(r.due).toBe(false);
   });
 });
 
-// ─── Group F: Custom config ───────────────────────────────────────────────────
-
-describe("parseBill — custom paidWeeks / almostWeeks", () => {
-  test("F1: paidWeeks=-1 (shorter window) → recent-enough payment outside window", () => {
+describe("parseBill — custom paid/almost window config", () => {
+  test("F1: paid.weeks=-1 → payment outside shorter window → overdue", () => {
     const shortCfg = { paid: { weeks: -1 }, almost: { weeks: -1 } };
-    // lastDue = Feb 15, paymentWindowStart = Feb 8 (-1 week)
-    // payment = Feb 5 (before Feb 8) → NOT in window
+    // lastDue=Feb15, paymentWindowStart=Feb8; payment=Feb05 < Feb8 → NOT in window
     const r = parseBill(
       mkBill("2023-01-15", ["2024-02-05"]),
       mkNow("2024-03-10"),
@@ -204,23 +178,43 @@ describe("parseBill — custom paidWeeks / almostWeeks", () => {
     expect(r.paid).toBe(false);
   });
 
-  test("F2: almostWeeks=-2 (longer almost window) → shows almost 12 days before due", () => {
+  test("F0: partial config (no almost key) → DEFAULT_CONFIG.almost used, no crash", () => {
+    // cfg.almost is undefined → DEFAULT_CONFIG.almost={weeks:-1} → advanceStart=Mar08
+    // now=Mar10 > Mar08 → past almost window → paid=false (but not due)
+    const r = parseBill(
+      mkBill("2023-01-15", ["2024-03-05"]),
+      mkNow("2024-03-10"),
+      { paid: { weeks: -3 } }
+    );
+    expect(r.due).toBe(false);
+    expect(r.last_payment).not.toBeNull();
+  });
+
+  test("F0b: partial config (no paid key) → defaults used, no crash", () => {
+    // cfg.paid is undefined → DEFAULT_CONFIG.paid used (covers L180 default branch)
+    const r = parseBill(
+      mkBill("2023-01-15", []),
+      mkNow("2024-03-10"),
+      { almost: { weeks: -1 } }
+    );
+    expect(r.paid).toBe(false);
+    expect(r.due).toBe(true);
+  });
+
+  test("F2: almost.weeks=-2 → wider advance window → paid:true", () => {
     const wideCfg = { paid: { weeks: -3 }, almost: { weeks: -2 } };
-    // nextDue = Mar 15, almostStart = Mar 1, now = Mar 10 → inside almost
     const r = parseBill(
       mkBill("2023-01-15", ["2024-03-05"]),
       mkNow("2024-03-10"),
       wideCfg
     );
-    expect(r.paid).toBe(false);
+    expect(r.paid).toBe(true);
     expect(r.due).toBe(false);
   });
 });
 
-// ─── Group G: Edge / null guards ─────────────────────────────────────────────
-
-describe("parseBill — null and missing field guards", () => {
-  test("G1: paid_dates empty array → last_payment:null", () => {
+describe("parseBill — null / missing field guards", () => {
+  test("G1: paid_dates empty → last_payment:null", () => {
     const r = parseBill(mkBill("2023-01-15", []), mkNow("2024-03-10"), cfg);
     expect(r.last_payment).toBeNull();
   });
@@ -234,24 +228,161 @@ describe("parseBill — null and missing field guards", () => {
     expect(() => parseBill(bill, mkNow("2024-03-10"), cfg)).not.toThrow();
   });
 
-  test("G3: paid_dates with null entry → skipped, no crash", () => {
+  test("G3: paid_dates with null entries → skipped, valid entry used", () => {
     const bill = {
       name: "X",
       date: moment("2023-01-15").format(FF),
-      paid_dates: [
-        null,
-        { date: null },
-        { date: moment("2024-03-05").format(FF) }
-      ]
+      paid_dates: [null, { date: null }, { date: moment("2024-03-05").format(FF) }]
     };
     expect(() => parseBill(bill, mkNow("2024-03-10"), cfg)).not.toThrow();
     const r = parseBill(bill, mkNow("2024-03-10"), cfg);
     expect(r.last_payment.format("YYYY-MM-DD")).toBe("2024-03-05");
   });
 
-  test("G4: config null → uses defaults without crash", () => {
+  test("G4: config null → uses defaults, no crash", () => {
     expect(() =>
       parseBill(mkBill("2023-01-15"), mkNow("2024-03-10"), null)
     ).not.toThrow();
+  });
+});
+
+// ─── parseBills ───────────────────────────────────────────────────────────────
+
+describe("parseBills — sort order", () => {
+  test("P1: due bills sort before paid", () => {
+    const now = mkNow("2024-03-20");
+    const result = parseBills(
+      [
+        mkBill("2023-01-15", ["2024-03-05"], "Gas"),
+        mkBill("2023-01-10", [], "Water")
+      ],
+      now,
+      cfg
+    );
+    expect(result[0].name).toBe("Water"); // due
+    expect(result[1].name).toBe("Gas"); // paid
+  });
+
+  test("P2: sort order = due → unpaid → paid", () => {
+    const now = mkNow("2024-03-10");
+    const data = [
+      mkBill("2023-01-01", ["2024-03-01"], "Electric"),
+      mkBill("2023-01-12", ["2024-02-12"], "Gas"),
+      mkBill("2023-01-05", [], "Water")
+    ];
+    const result = parseBills(data, now, cfg);
+    expect(result[0].name).toBe("Water"); // due
+    expect(result[1].name).toBe("Gas"); // unpaid
+    expect(result[2].name).toBe("Electric"); // paid
+  });
+
+  test("P3: same group → sort by expected_date ascending", () => {
+    const now = mkNow("2024-03-20");
+    const result = parseBills(
+      [
+        mkBill("2023-01-15", [], "Internet"),
+        mkBill("2023-01-10", [], "Water")
+      ],
+      now,
+      cfg
+    );
+    expect(result[0].name).toBe("Water"); // earlier due date (Mar10)
+    expect(result[1].name).toBe("Internet");
+  });
+
+  test("P4: same group+date → sort by last_payment ascending (oldest first)", () => {
+    const now = mkNow("2024-03-01");
+    const result = parseBills(
+      [
+        mkBill("2023-01-01", ["2024-02-20"], "Electric"),
+        mkBill("2023-01-01", ["2024-02-10"], "Gas")
+      ],
+      now,
+      cfg
+    );
+    expect(result[0].name).toBe("Gas"); // older payment first
+    expect(result[1].name).toBe("Electric");
+  });
+
+  test("P5: null last_payment sorts before any real payment", () => {
+    const now = mkNow("2024-03-01");
+    const result = parseBills(
+      [
+        mkBill("2023-01-01", ["2024-02-10"], "Electric"),
+        mkBill("2024-03-01", [], "Phone")
+      ],
+      now,
+      cfg
+    );
+    expect(result[0].name).toBe("Phone"); // null last_payment → 0 → first
+  });
+
+  test("P6: same group+date+payment → sort by name ascending", () => {
+    const now = mkNow("2024-03-01");
+    const result = parseBills(
+      [
+        mkBill("2023-01-01", ["2024-02-01"], "Zeta"),
+        mkBill("2023-01-01", ["2024-02-01"], "Alpha")
+      ],
+      now,
+      cfg
+    );
+    expect(result[0].name).toBe("Alpha");
+    expect(result[1].name).toBe("Zeta");
+  });
+});
+
+describe("parseBills — output format", () => {
+  test("P7: empty array → returns []", () => {
+    expect(parseBills([], mkNow("2024-03-10"), cfg)).toEqual([]);
+  });
+
+  test("P8: single bill → array length 1", () => {
+    const r = parseBills([mkBill("2023-01-15")], mkNow("2024-03-10"), cfg);
+    expect(r).toHaveLength(1);
+  });
+
+  test("P9: moment objects serialized to strings in output", () => {
+    const r = parseBills(
+      [mkBill("2023-01-15", ["2024-03-05"])],
+      mkNow("2024-03-10"),
+      cfg
+    );
+    const bill = r[0];
+    expect(typeof bill.expected_date).toBe("string");
+    expect(typeof bill.last_payment).toBe("string");
+    expect(moment.isMoment(bill.expected_date)).toBe(false);
+    expect(moment.isMoment(bill.last_payment)).toBe(false);
+  });
+
+  test("P10: null last_payment stays null (not stringified)", () => {
+    const r = parseBills([mkBill("2024-03-10")], mkNow("2024-03-10"), cfg);
+    expect(r[0].last_payment).toBeNull();
+  });
+});
+
+// ─── UMD browser branch ───────────────────────────────────────────────────────
+
+describe("billParser — UMD browser branch (Line 64)", () => {
+  test("L1: browser path sets root.BillParser when module is undefined", () => {
+    const vm = require("vm");
+    const fs = require("fs");
+    const path = require("path");
+
+    const src = fs.readFileSync(
+      path.resolve(__dirname, "../lib/billParser.js"),
+      "utf8"
+    );
+    const fakeRoot = {
+      moment: require("moment"),
+      fastSort: require("fast-sort")
+    };
+
+    // No `module` in sandbox → else branch executes → root.BillParser set
+    vm.runInNewContext(src, { globalThis: fakeRoot });
+
+    expect(fakeRoot.BillParser).toBeDefined();
+    expect(typeof fakeRoot.BillParser.parseBill).toBe("function");
+    expect(typeof fakeRoot.BillParser.parseBills).toBe("function");
   });
 });

@@ -1,48 +1,39 @@
-jest.mock("axios");
-jest.mock("fs");
-
-const axios = require("axios");
 const fs = require("fs");
 const moment = require("moment");
 const helper = require("../node_helper");
 
 const VALID_BILLS_RESPONSE = {
-  data: {
-    data: [
-      {
-        id: "1",
-        attributes: {
-          active: true,
-          name: "Electric",
-          date: "2023-01-15T00:00:00+0000",
-          paid_dates: []
-        }
-      },
-      {
-        id: "2",
-        attributes: {
-          active: false,
-          name: "Inactive Bill",
-          date: "2023-01-20T00:00:00+0000",
-          paid_dates: []
-        }
+  data: [
+    {
+      id: "1",
+      attributes: {
+        active: true,
+        name: "Electric",
+        date: "2023-01-15T00:00:00+0000",
+        paid_dates: []
       }
-    ]
-  }
+    },
+    {
+      id: "2",
+      attributes: {
+        active: false,
+        name: "Inactive Bill",
+        date: "2023-01-20T00:00:00+0000",
+        paid_dates: []
+      }
+    }
+  ]
 };
 
-let mockClient;
-
 beforeEach(() => {
-  jest.clearAllMocks();
-  // Reset helper state
-  helper.sendSocketNotification = jest.fn();
+  vi.clearAllMocks();
+  vi.unstubAllGlobals();
+  helper.sendSocketNotification = vi.fn();
   helper.start();
-  // Mock package.json read for getVersion()
-  fs.readFileSync.mockReturnValue(JSON.stringify({ version: "4.4.0" }));
-  // Mock axios instance
-  mockClient = { get: jest.fn() };
-  axios.create.mockReturnValue(mockClient);
+  vi.spyOn(fs, "readFileSync").mockReturnValue(
+    JSON.stringify({ version: "5.0.0" })
+  );
+  vi.stubGlobal("fetch", vi.fn());
 });
 
 // ─── checkBillsResponse ───────────────────────────────────────────────────────
@@ -54,21 +45,21 @@ describe("checkBillsResponse", () => {
 
   test("NC2: empty data array → does not throw", () => {
     expect(() =>
-      helper.checkBillsResponse({ data: { data: [] } })
+      helper.checkBillsResponse({ data: [] })
     ).not.toThrow();
   });
 
-  test("NC3: missing response.data → throws", () => {
+  test("NC3: missing data key → throws", () => {
     expect(() => helper.checkBillsResponse({})).toThrow();
   });
 
-  test("NC4: data.data is string → throws", () => {
+  test("NC4: data is string → throws", () => {
     expect(() =>
-      helper.checkBillsResponse({ data: { data: "invalid" } })
+      helper.checkBillsResponse({ data: "invalid" })
     ).toThrow();
   });
 
-  test("NC5: null response → throws without crashing process", () => {
+  test("NC5: null body → throws without crashing process", () => {
     expect(() => helper.checkBillsResponse(null)).toThrow();
   });
 });
@@ -77,8 +68,12 @@ describe("checkBillsResponse", () => {
 
 describe("getBills", () => {
   test("NB1: successful API call caches active bills", async () => {
-    mockClient.get.mockResolvedValue(VALID_BILLS_RESPONSE);
-    helper.client = mockClient;
+    fetch.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue(VALID_BILLS_RESPONSE)
+    });
+    helper.baseURL = "http://localhost:9696/api/v1";
+    helper.token = "mock-token";
 
     await helper.getBills();
 
@@ -92,8 +87,9 @@ describe("getBills", () => {
       { id: "cached", attributes: { active: true, name: "Cached" } }
     ];
     helper.bills = existing;
-    mockClient.get.mockRejectedValue(new Error("Network error"));
-    helper.client = mockClient;
+    fetch.mockRejectedValue(new Error("Network error"));
+    helper.baseURL = "http://localhost:9696/api/v1";
+    helper.token = "mock-token";
 
     await helper.getBills();
 
@@ -102,8 +98,12 @@ describe("getBills", () => {
   });
 
   test("NB3: filters out inactive bills", async () => {
-    mockClient.get.mockResolvedValue(VALID_BILLS_RESPONSE);
-    helper.client = mockClient;
+    fetch.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue(VALID_BILLS_RESPONSE)
+    });
+    helper.baseURL = "http://localhost:9696/api/v1";
+    helper.token = "mock-token";
 
     await helper.getBills();
 
@@ -112,27 +112,61 @@ describe("getBills", () => {
   });
 
   test("NB4 (Bug 4 regression): start param uses 3-year lookback", async () => {
-    mockClient.get.mockResolvedValue({ data: { data: [] } });
-    helper.client = mockClient;
+    fetch.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ data: [] })
+    });
+    helper.baseURL = "http://localhost:9696/api/v1";
+    helper.token = "mock-token";
 
     await helper.getBills();
 
-    const callArgs = mockClient.get.mock.calls[0];
-    const params = callArgs[1].params;
-    const startDate = moment(params.start, "YYYY-MM-DD");
-    const endDate = moment(params.end, "YYYY-MM-DD");
+    const callArgs = fetch.mock.calls[0];
+    const url = new URL(callArgs[0]);
+    const startDate = moment(url.searchParams.get("start"), "YYYY-MM-DD");
+    const endDate = moment(url.searchParams.get("end"), "YYYY-MM-DD");
 
-    // Date window must span at least 3 years
     const spanYears = endDate.diff(startDate, "years", true);
     expect(spanYears).toBeGreaterThanOrEqual(3);
-
-    // start must be at least 2 years in the past (not just 1 year)
     expect(startDate.isBefore(moment().subtract(2, "years"))).toBe(true);
   });
 
+  test("NB6: HTTP error response (ok=false) → throws, preserves cache", async () => {
+    const existing = [{ id: "cached", attributes: { active: true, name: "Cached" } }];
+    helper.bills = existing;
+    fetch.mockResolvedValue({ ok: false, status: 401, json: vi.fn() });
+    helper.baseURL = "http://localhost:9696/api/v1";
+    helper.token = "bad-token";
+
+    await helper.getBills();
+
+    expect(helper.bills).toBe(existing);
+  });
+
+  test("NB7: bills unchanged (ready=true + same cache) → no reassignment", async () => {
+    const existing = [VALID_BILLS_RESPONSE.data[0]];
+    fetch.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue(VALID_BILLS_RESPONSE)
+    });
+    helper.baseURL = "http://localhost:9696/api/v1";
+    helper.token = "mock-token";
+    helper.bills = existing;
+    helper.ready = true;
+
+    await helper.getBills();
+
+    expect(helper.bills).toBe(existing);
+    expect(helper.ready).toBe(true);
+  });
+
   test("NB5: busy flag reset to false after getBills completes", async () => {
-    mockClient.get.mockResolvedValue({ data: { data: [] } });
-    helper.client = mockClient;
+    fetch.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ data: [] })
+    });
+    helper.baseURL = "http://localhost:9696/api/v1";
+    helper.token = "mock-token";
     helper.busy = true;
 
     await helper.getBills();
@@ -144,24 +178,21 @@ describe("getBills", () => {
 // ─── notificationReceived ─────────────────────────────────────────────────────
 
 describe("notificationReceived — GET_VERSION", () => {
-  test("NN1: GET_VERSION initializes axios client and sends version", () => {
+  test("NN1: GET_VERSION stores baseURL/token and sends version", () => {
     helper.notificationReceived("GET_VERSION", {
       url: "http://localhost:9696",
       token: "test-token"
     });
 
-    expect(axios.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        baseURL: expect.stringContaining("localhost:9696")
-      })
-    );
+    expect(helper.baseURL).toContain("localhost:9696");
+    expect(helper.token).toBe("test-token");
     expect(helper.sendSocketNotification).toHaveBeenCalledWith(
       expect.stringContaining("VERSION"),
       expect.any(String)
     );
   });
 
-  test("NN6: GET_VERSION called twice overwrites client cleanly", () => {
+  test("NN6: GET_VERSION called twice overwrites baseURL and token", () => {
     helper.notificationReceived("GET_VERSION", {
       url: "http://host1",
       token: "t1"
@@ -171,14 +202,15 @@ describe("notificationReceived — GET_VERSION", () => {
       token: "t2"
     });
 
-    expect(axios.create).toHaveBeenCalledTimes(2);
-    expect(helper.client).toBe(mockClient); // last call's return value
+    expect(helper.baseURL).toContain("host2");
+    expect(helper.token).toBe("t2");
   });
 });
 
 describe("notificationReceived — GET_BILLS", () => {
   test("NN2 (Bug 1 regression): busy=true → sends cached bills, does not fetch", () => {
-    helper.client = mockClient;
+    helper.baseURL = "http://localhost:9696/api/v1";
+    helper.token = "mock-token";
     helper.busy = true;
     helper.bills = [
       { id: "1", attributes: { active: true, name: "X", paid_dates: [] } }
@@ -190,26 +222,40 @@ describe("notificationReceived — GET_BILLS", () => {
       expect.stringContaining("BILLS"),
       expect.any(Array)
     );
-    expect(mockClient.get).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
-  test("NN3 (Bug 3 regression): client=null → no crash, no fetch, no notification", () => {
-    helper.client = null;
+  test("NN3 (Bug 3 regression): baseURL=null → no crash, no fetch, no notification", () => {
+    helper.baseURL = null;
 
     expect(() => helper.notificationReceived("GET_BILLS")).not.toThrow();
-    expect(mockClient.get).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
     expect(helper.sendSocketNotification).not.toHaveBeenCalled();
   });
 
-  test("NN4: not busy + client set → triggers API fetch", () => {
-    helper.client = mockClient;
+  test("NN4: not busy + baseURL set → triggers API fetch", () => {
+    helper.baseURL = "http://localhost:9696/api/v1";
+    helper.token = "mock-token";
     helper.busy = false;
-    mockClient.get.mockResolvedValue({ data: { data: [] } });
+    fetch.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ data: [] })
+    });
 
     helper.notificationReceived("GET_BILLS");
 
-    // busy flag set synchronously before async fetch
     expect(helper.busy).toBe(true);
+  });
+
+  test("NN4b: getBills rejection in notificationReceived is swallowed by .catch", async () => {
+    helper.baseURL = "http://localhost:9696/api/v1";
+    helper.token = "mock-token";
+    vi.spyOn(helper, "getBills").mockRejectedValue(new Error("boom"));
+
+    helper.notificationReceived("GET_BILLS");
+
+    await new Promise((r) => setTimeout(r, 20));
+    // no unhandled rejection, no crash
   });
 
   test("NN5: unknown notification → no crash, no sendSocketNotification", () => {
@@ -217,5 +263,24 @@ describe("notificationReceived — GET_BILLS", () => {
       helper.notificationReceived("UNKNOWN_EVENT", {})
     ).not.toThrow();
     expect(helper.sendSocketNotification).not.toHaveBeenCalled();
+  });
+});
+
+// ─── socketNotificationReceived ──────────────────────────────────────────────
+
+describe("socketNotificationReceived", () => {
+  test("NS1: strips module prefix and delegates to notificationReceived", () => {
+    helper.baseURL = null;
+
+    expect(() =>
+      helper.socketNotificationReceived(`${helper.name}_GET_BILLS`)
+    ).not.toThrow();
+    expect(helper.sendSocketNotification).not.toHaveBeenCalled();
+  });
+
+  test("NS2: payload null fallback — no crash when payload omitted", () => {
+    expect(() =>
+      helper.socketNotificationReceived(`${helper.name}_UNKNOWN_EVENT`)
+    ).not.toThrow();
   });
 });

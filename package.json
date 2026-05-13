@@ -1,6 +1,6 @@
 {
   "name": "MMM-FireflyBills",
-  "version": "4.2.0",
+  "version": "5.0.0",
   "description": "MagicMirror module to display a list of bills from FireFly III",
   "main": "MMM-FireflyBills.js",
   "author": "Andrés Vanegas <ukab72106@gmail.com>",
@@ -9,19 +9,32 @@
     "url": "https://github.com/angeldeejay/MMM-FireflyBills"
   },
   "devDependencies": {
-    "jest": "^29.7.0",
-    "prettier": "^3.8.1"
+    "@eslint/js": "^9.27.0",
+    "@mswjs/http-middleware": "^0.10.3",
+    "@vitest/coverage-v8": "^4.1.6",
+    "eslint": "^9.27.0",
+    "msw": "^2.14.6",
+    "prettier": "^3.8.1",
+    "vitest": "^4.1.6"
+  },
+  "sandbox": {
+    "startup": [
+      "mock-api:start"
+    ]
   },
   "scripts": {
     "format": "prettier --write .",
-    "lint": "prettier --check .",
-    "test": "jest",
-    "test:coverage": "jest --coverage",
-    "test:lint": "npm run lint"
+    "lint": "eslint && prettier --check .",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "test:lint": "node --run lint",
+    "mock-api:start": "node tools/firefly-mock/server.js",
+    "sandbox:start": "magicmirror-module-sandbox",
+    "sandbox:watch": "magicmirror-module-sandbox --watch"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.2.0",
-    "axios": "^1.13.6",
     "fast-sort": "^3.4.1",
     "moment": "^2.30.1"
   }
