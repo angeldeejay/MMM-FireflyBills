@@ -5,6 +5,23 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [5.1.0] — 2026-05-19
+
+### Added
+
+- Web Worker (`lib/billWorker.js`) that runs `parseBills`, sort, and JSON-diff in a dedicated thread.
+
+### Changed
+
+- Frontend no longer parses bills on the main thread. Raw bills from the helper are forwarded to the worker, and the main thread only renders when the worker reports a changed payload. This keeps the UI responsive when other modules on the same MagicMirror² instance are CPU-bound and prevents this module from contributing to event-loop backpressure on sibling modules' socket traffic.
+- Polling cadence is preserved (no `updateInterval` change). The next `getBills()` is now scheduled from the worker callback instead of the socket handler.
+
+### Fallback
+
+- If `Worker` construction fails, the module reverts to the previous main-thread parse path. No user action required.
+
+---
+
 ## [5.0.0] — 2026-05-12
 
 ### Added

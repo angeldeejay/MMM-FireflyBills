@@ -51,10 +51,39 @@ Module.register("MMM-FireflyBills", {
     }
   },
 
-  /** Merges user config with defaults and triggers the initial version handshake. */
+  /** @type {Worker|null} Bill-parsing worker (offloads parseBills + diff from main thread). */
+  worker: null,
+
+  /** Merges user config with defaults, spawns the parsing worker, and triggers the initial version handshake. */
   start() {
     this.config = { ...this.defaults, ...this.config };
+    this.lang = (typeof config !== "undefined" && config.language) || null;
+    this.spawnWorker();
     this.getVersion();
+  },
+
+  /** Creates the bill-parsing Web Worker and wires its onmessage handler. */
+  spawnWorker() {
+    try {
+      this.worker = new Worker(this.file("lib/billWorker.js"));
+    } catch (err) {
+      console.error(`${this.name} :: Worker spawn failed: ${err}`);
+      this.worker = null;
+      return;
+    }
+    this.worker.onmessage = (event) => {
+      const data = event.data || {};
+      if (data.error) {
+        console.error(`${this.name} :: worker error: ${data.error}`);
+      } else if (!data.unchanged && Array.isArray(data.parsed)) {
+        this.jsonData = data.parsed;
+        this.updateDom(this.config.animationSpeed);
+      }
+      setTimeout(() => this.getBills(), this.config.updateInterval);
+    };
+    this.worker.onerror = (e) => {
+      console.error(`${this.name} :: worker fatal: ${e.message}`);
+    };
   },
 
   /** Sends GET_VERSION to the helper to initialize the Firefly III HTTP client. */
@@ -117,15 +146,25 @@ Module.register("MMM-FireflyBills", {
         this.getBills();
         break;
       case `${this.name}_BILLS`: {
-        const jsonData = this.parseBills(payload, moment());
-        if (
-          !this.jsonData ||
-          JSON.stringify(this.jsonData) !== JSON.stringify(jsonData)
-        ) {
-          this.jsonData = jsonData;
-          this.updateDom(this.config.animationSpeed);
+        if (this.worker) {
+          this.worker.postMessage({
+            raw: payload,
+            config: this.config,
+            lang: this.lang,
+            ts: Date.now()
+          });
+        } else {
+          // Fallback: worker unavailable, parse on main thread (legacy path).
+          const jsonData = this.parseBills(payload, moment());
+          if (
+            !this.jsonData ||
+            JSON.stringify(this.jsonData) !== JSON.stringify(jsonData)
+          ) {
+            this.jsonData = jsonData;
+            this.updateDom(this.config.animationSpeed);
+          }
+          setTimeout(() => this.getBills(), this.config.updateInterval);
         }
-        setTimeout(() => this.getBills(), this.config.updateInterval);
         break;
       }
       default:
