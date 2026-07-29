@@ -304,6 +304,22 @@ describe("parseBill — new/future bill WITH payments (first-payment fix, v5.2)"
     expect(r.expected_date.format("YYYY-MM-DD")).toBe("2026-07-30");
   });
 
+  test("H6: bill anchored BEYOND next cycle with a linked payment → stays quiet future (no synthetic dues)", () => {
+    // Bill starts Dec 15 (months away), stray linked payment Jul 25, viewed Jul 29.
+    // nextDue (synthetic, from day-of-month) = Aug 15 < billDate → payment must
+    // NOT preempt: no monthly expectations before the bill is real. Future case
+    // wins: paid ✓, expected = Dec 15, and the payment is still shown.
+    const r = parseBill(
+      mkBill("2026-12-15", ["2026-07-25"]),
+      mkNow("2026-07-29"),
+      cfg
+    );
+    expect(r.paid).toBe(true);
+    expect(r.due).toBe(false);
+    expect(r.expected_date.format("YYYY-MM-DD")).toBe("2026-12-15");
+    expect(r.last_payment.format("YYYY-MM-DD")).toBe("2026-07-25");
+  });
+
   test("H5: day-after boundary — new bill paid Jul29, viewed Jul31 → still advance-covered", () => {
     // Once Jul30 passes, lastDue=Jul30: payment Jul29 >= advanceWindowStart
     // (Aug30-1w=Aug23)? No. >= paymentWindowStart (Jul30-3w=Jul09)? Yes →

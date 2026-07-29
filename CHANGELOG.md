@@ -5,6 +5,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [5.2.1] — 2026-07-29
+
+### Fixed
+
+- Guard on the v5.2.0 payment-first classification: payments preempt the future/new-bill guards only when `billDate <= nextDue` (the bill started, or starts within the incoming cycle). Prevents a bill anchored beyond the next cycle (e.g. starting months from now) with an early linked payment from projecting synthetic monthly due dates — and raising false alarms — before the bill is real.
+
+---
+
 ## [5.2.0] — 2026-07-29
 
 ### Fixed
