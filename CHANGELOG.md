@@ -5,6 +5,15 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [5.2.0] — 2026-07-29
+
+### Fixed
+
+- First-payment visibility on new/future bills: payment-based classification (advance / covers-cycle) now runs BEFORE the future-bill and new-bill guards in `parseBill()`. Previously a bill whose FIRST payment arrived before its very first due date displayed "-" (no payment) until that due date passed, even though the payment was recorded in Firefly (real-world case: a new credit card bill anchored Jun 30, paid Jul 29, showed unpaid until Jul 30).
+- The new-bill and future-bill cases now pass `last_payment` through instead of forcing `null` — a stray payment outside both windows is still shown, never hidden.
+
+---
+
 ## [5.1.0] — 2026-05-19
 
 ### Added

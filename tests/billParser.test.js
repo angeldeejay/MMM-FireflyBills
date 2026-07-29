@@ -246,6 +246,80 @@ describe("parseBill — null / missing field guards", () => {
   });
 });
 
+describe("parseBill — new/future bill WITH payments (first-payment fix, v5.2)", () => {
+  test("H1: new bill, first payment before its first due → payment shown, advance", () => {
+    // The real-world case (VISA Infinity): bill anchored Jun30, first payment
+    // Jul29, viewed Jul29. lastDue=Jun30 (Jul30 not reached), nextDue=Jul30,
+    // advanceWindowStart=Jul23. Payment Jul29 >= Jul23 → advance → Aug30.
+    // Pre-fix: the new-bill guard ran first and returned last_payment:null ("-").
+    const r = parseBill(
+      mkBill("2026-06-30", ["2026-07-29"]),
+      mkNow("2026-07-29"),
+      cfg
+    );
+    expect(r.last_payment).not.toBeNull();
+    expect(r.last_payment.format("YYYY-MM-DD")).toBe("2026-07-29");
+    expect(r.paid).toBe(true);
+    expect(r.due).toBe(false);
+    expect(r.expected_date.format("YYYY-MM-DD")).toBe("2026-08-30");
+  });
+
+  test("H2: FUTURE bill already paid before it starts → payment shown, advance", () => {
+    // Bill starts Jun30 (future), payment Jun26, viewed Jun28.
+    // lastDue=May30, nextDue=Jun30, advanceWindowStart=Jun23.
+    // Jun26 >= Jun23 → advance → expected Jul30. Pre-fix: future-bill guard
+    // returned last_payment:null and expected=billDate.
+    const r = parseBill(
+      mkBill("2026-06-30", ["2026-06-26"]),
+      mkNow("2026-06-28"),
+      cfg
+    );
+    expect(r.last_payment).not.toBeNull();
+    expect(r.last_payment.format("YYYY-MM-DD")).toBe("2026-06-26");
+    expect(r.paid).toBe(true);
+    expect(r.due).toBe(false);
+    expect(r.expected_date.format("YYYY-MM-DD")).toBe("2026-07-30");
+  });
+
+  test("H3: new bill with an OLD payment outside both windows → shown, not hidden", () => {
+    // Bill anchored Jun30, stray payment May01, viewed Jul29.
+    // Not advance (May01 < Jul23), not covering (May01 < Jun09) → new-bill case,
+    // but last_payment passes through instead of null.
+    const r = parseBill(
+      mkBill("2026-06-30", ["2026-05-01"]),
+      mkNow("2026-07-29"),
+      cfg
+    );
+    expect(r.last_payment).not.toBeNull();
+    expect(r.last_payment.format("YYYY-MM-DD")).toBe("2026-05-01");
+    expect(r.due).toBe(false);
+    expect(r.expected_date.format("YYYY-MM-DD")).toBe("2026-07-30");
+  });
+
+  test("H4: new bill with NO payments → unchanged (paid, null payment, nextDue)", () => {
+    const r = parseBill(mkBill("2026-06-30"), mkNow("2026-07-29"), cfg);
+    expect(r.last_payment).toBeNull();
+    expect(r.paid).toBe(false); // within 1w of Jul30 → almost/warning state
+    expect(r.due).toBe(false);
+    expect(r.expected_date.format("YYYY-MM-DD")).toBe("2026-07-30");
+  });
+
+  test("H5: day-after boundary — new bill paid Jul29, viewed Jul31 → still advance-covered", () => {
+    // Once Jul30 passes, lastDue=Jul30: payment Jul29 >= advanceWindowStart
+    // (Aug30-1w=Aug23)? No. >= paymentWindowStart (Jul30-3w=Jul09)? Yes →
+    // covers lastDue → expected Aug30. Display stays consistent across the due date.
+    const r = parseBill(
+      mkBill("2026-06-30", ["2026-07-29"]),
+      mkNow("2026-07-31"),
+      cfg
+    );
+    expect(r.last_payment.format("YYYY-MM-DD")).toBe("2026-07-29");
+    expect(r.paid).toBe(true);
+    expect(r.due).toBe(false);
+    expect(r.expected_date.format("YYYY-MM-DD")).toBe("2026-08-30");
+  });
+});
+
 // ─── parseBills ───────────────────────────────────────────────────────────────
 
 describe("parseBills — sort order", () => {
